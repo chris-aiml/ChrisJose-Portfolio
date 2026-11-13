@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { engine } from './story/engine'
 import { Cursor } from './ui/Cursor'
 import { Sparkle } from './ui/Sparkle'
@@ -31,6 +32,7 @@ export function App({ flow }: { flow: boolean }) {
       <Cursor />
       <Sparkle />
       <Resume />
+      <Analytics />
     </>
   )
 }
