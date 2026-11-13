@@ -1,0 +1,38 @@
+{
+  "name": "cj-1307-portfolio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "bake": "tsx scripts/bake-theatre-state.ts",
+    "verify:state": "tsx scripts/verify-state.ts",
+    "build": "npm run bake && tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter-tight": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource/chakra-petch": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/orbitron": "^5.3.0",
+    "@react-three/fiber": "^8.18.0",
+    "@theatre/core": "^0.7.2",
+    "@theatre/r3f": "^0.7.2",
+    "lenis": "^1.1.20",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@theatre/studio": "^0.7.2",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@types/three": "^0.169.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "puppeteer-core": "^25.17.0",
+    "tsx": "^4.23.15",
+    "typescript": "5.6",
+    "vite": "^5.4.21"
+  }
+}
