@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lucen · MVP prototype</title>
+<style>
+:root{
+  --bg:#0f1115; --canvas:#161920; --raise:#1c2029; --raise2:#242a36; --hover:rgba(255,255,255,.045);
+  --text:#e9ecf2; --muted:#9097a8; --dim:#6a7285;
+  --cobalt:#2f5bff; --cobalt-hi:#7391ff; --cobalt-lo:rgba(47,91,255,.15);
+  --ok:#43d39e; --warn:#f5b84b; --bad:#ff6b72; --hr:#ff8a8f; --resp:#5cc8d7;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);color-scheme:dark}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;min-height:100vh}
+button,input,select{font:inherit;color:inherit;border:0}
+button{cursor:pointer;background:none;border:0}
+ul{list-style:none}
+b,strong{font-weight:650}
+
+/* every interactive element transitions */
+button,.btn,.tab,.nav button,input,select,textarea,.seg button,.opt,tbody tr,.sw,.pillbtn,a{transition:all .2s ease}
+:focus{outline:none}
+:focus-visible{box-shadow:0 0 0 3px rgba(115,145,255,.55)}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:26px 16px 18px;background:var(--bg);z-index:5}
+.brand{display:flex;align-items:center;gap:12px;padding:0 10px 26px}
+.brand svg{width:30px;height:30px;flex:none}
+.brand b{font-size:19px;letter-spacing:-.01em;font-weight:700;display:block;line-height:1.1}
+.brand small{font-size:11.5px;color:var(--dim);letter-spacing:.04em}
+.navgrp{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:650;padding:18px 12px 8px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:10px;color:var(--muted);text-align:left;font-weight:500;position:relative;width:100%}
+.nav button svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav button kbd{margin-left:auto;font:500 11px var(--mono);color:var(--dim);opacity:0}
+.nav button:hover{background:var(--hover);color:var(--text)}
+.nav button:hover kbd{opacity:1}
+.nav button:active{transform:scale(.98)}
+.nav button.on{background:var(--cobalt-lo);color:#fff}
+.nav button.on svg{color:var(--cobalt-hi)}
+.nav button.on::before{content:"";position:absolute;left:-16px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--cobalt)}
+.sidefoot{margin-top:auto;display:flex;flex-direction:column;gap:16px;padding:0 4px}
+.lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:650;margin-bottom:8px;display:block}
+.device{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none;transition:all .2s ease}
+.dot.live{background:var(--ok);box-shadow:0 0 0 0 rgba(67,211,158,.6);animation:pulse 1.6s infinite}
+.dot.alert{background:var(--bad)}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(67,211,158,0)}100%{box-shadow:0 0 0 0 rgba(67,211,158,0)}}
+
+.main{min-width:0;overflow-x:clip;background:var(--canvas);border-radius:22px 0 0 22px;margin:10px 0 10px 0;min-height:calc(100vh - 20px)}
+.work{max-width:1240px;margin:0 auto;padding:44px 52px 80px}
+.view{display:none}
+.view.on{display:block;animation:rise .35s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.eyebrow{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--cobalt-hi);font-weight:650;margin-bottom:10px}
+h1{font-size:34px;letter-spacing:-.025em;font-weight:680;line-height:1.1}
+h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:650;margin-bottom:16px}
+h3{font-size:16px;font-weight:650;letter-spacing:-.005em}
+.lead{color:var(--muted);font-size:16px;max-width:66ch;margin:14px 0 34px}
+.note{color:var(--muted);font-size:13.5px;line-height:1.6;margin-top:12px;max-width:70ch}
+.note b{color:var(--text)}
+.good{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.hi{color:var(--cobalt-hi)}
+
+/* ---------- surfaces: shade, never boxes ---------- */
+.surface{background:var(--bg);border-radius:16px;padding:26px}
+.gap{height:36px}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:40px;align-items:start}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:start}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px}
+.four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:32px}
+
+/* ---------- controls ---------- */
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:28px}
+.spacer{flex:1}
+.btn{height:40px;padding:0 18px;border-radius:10px;background:var(--raise);font-weight:600;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:2px;white-space:nowrap}
+.btn:hover{background:var(--raise2);transform:translateY(-1px)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn.primary{background:var(--cobalt);color:#fff}
+.btn.primary:hover{background:#4a73ff;box-shadow:0 6px 22px -6px rgba(47,91,255,.7)}
+.btn.primary:active{background:#2349d8;box-shadow:none}
+.btn.text{background:transparent;color:var(--muted);padding:0 10px}
+.btn.text:hover{color:#fff;background:var(--hover)}
+.btn:disabled{opacity:.55;cursor:progress;transform:none;box-shadow:none}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.28);border-top-color:#fff;display:inline-block;margin-right:9px;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.seg{display:inline-flex;background:var(--raise);border-radius:10px;padding:3px;gap:2px}
+.seg button{height:34px;padding:0 14px;border-radius:8px;color:var(--muted);font-weight:600;font-size:13.5px}
+.seg button:hover{color:#fff;background:var(--hover)}
+.seg button:active{transform:scale(.97)}
+.seg button.on{background:var(--cobalt);color:#fff}
+.seg.full{display:flex;width:100%}.seg.full button{flex:1;padding:0 6px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{height:34px;padding:0 14px;border-radius:999px;background:var(--raise);color:var(--muted);font-weight:550;font-size:13.5px}
+.tab:hover{background:var(--raise2);color:#fff;transform:translateY(-1px)}
+.tab:active{transform:scale(.97)}
+.tab.on{background:var(--cobalt-lo);color:#fff;box-shadow:inset 0 0 0 1.5px var(--cobalt)}
+.tab.mystery{color:var(--cobalt-hi)}
+.sw{display:inline-flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;cursor:pointer;padding:6px 10px;border-radius:8px;user-select:none}
+.sw:hover{background:var(--hover);color:var(--text)}
+.sw input{appearance:none;width:34px;height:20px;border-radius:999px;background:var(--raise2);position:relative;cursor:pointer;flex:none}
+.sw input::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#aab1c2;transition:all .2s ease}
+.sw input:checked{background:var(--cobalt)}
+.sw input:checked::after{left:17px;background:#fff}
+
+/* ---------- forms ---------- */
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 22px}
+.fld{display:flex;flex-direction:column;gap:7px;min-width:0}
+.fld.wide{grid-column:1/-1}
+.fld label{font-size:12.5px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.fld label i{font-style:normal;color:var(--dim);font-weight:500}
+.fld input,.fld select{height:44px;padding:0 14px;border-radius:10px;background:var(--raise);width:100%;font-size:15px;appearance:none;-webkit-appearance:none}
+.fld select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%239097a8' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px}
+.fld input:hover,.fld select:hover{background:var(--raise2)}
+.fld input:focus,.fld select:focus{background:var(--raise2);box-shadow:0 0 0 2px var(--cobalt)}
+.fld.invalid input,.fld.invalid select{box-shadow:0 0 0 2px var(--bad)}
+.fld .err{font-size:12.5px;color:var(--bad);max-height:0;opacity:0;overflow:hidden;transition:all .2s ease}
+.fld.invalid .err{max-height:40px;opacity:1}
+.fld option{background:#1c2029}
+.rng{display:flex;flex-direction:column;gap:9px}
+.rng label{font-size:13px;color:var(--muted);font-weight:550;display:flex;justify-content:space-between}
+.rng label b{color:#fff;font-weight:650}
+input[type=range]{appearance:none;-webkit-appearance:none;height:22px;background:transparent;width:100%;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:var(--raise2)}
+input[type=range]::-moz-range-track{height:4px;border-radius:4px;background:var(--raise2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-7px;border-radius:50%;background:var(--cobalt-hi);transition:all .2s ease}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:var(--cobalt-hi);transition:all .2s ease}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.18);background:#fff}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.05)}
+input[type=range]:hover::-moz-range-thumb{transform:scale(1.18);background:#fff}
+.formfoot{display:flex;align-items:center;gap:14px;margin-top:26px;flex-wrap:wrap}
+
+/* ---------- metrics and data ---------- */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:26px 32px}
+.m .k{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:650;margin-bottom:8px}
+.m .v{font-size:30px;font-weight:300;letter-spacing:-.02em;line-height:1.15}
+.m .v small{font-size:14px;font-weight:500;color:var(--muted);letter-spacing:0}
+.m .d{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.45}
+.tblw{overflow-x:auto}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+th{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);font-weight:650;text-align:left;padding:0 14px 12px}
+td{padding:13px 14px;vertical-align:top;color:var(--text)}
+td:first-child,th:first-child{padding-left:14px}
+tbody tr:hover{background:var(--hover)}
+tbody tr td:first-child{border-radius:10px 0 0 10px}tbody tr td:last-child{border-radius:0 10px 10px 0}
+td.c,th.c{text-align:center}
+td.r,th.r{text-align:right}
+tr.pick td{background:var(--cobalt-lo)}
+tr.click{cursor:pointer}
+.mutedtd{color:var(--muted)}
+.tick{color:var(--ok);font-weight:700}.dash{color:var(--dim)}
+.verdict{display:inline-block;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:650;background:rgba(67,211,158,.14);color:var(--ok)}
+.verdict.bad{background:rgba(255,107,114,.14);color:var(--bad)}
+.verdict.neutral{background:var(--cobalt-lo);color:var(--cobalt-hi)}
+.empty{color:var(--dim);padding:34px 0;font-size:14.5px}
+
+/* ---------- charts ---------- */
+.plotwrap{position:relative;margin-bottom:6px}
+.pl{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:650;margin-bottom:2px}
+.pl b{font-size:15px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+canvas.ch{display:block;width:100%}
+.plots .plotwrap + .plotwrap{margin-top:12px}
+
+@keyframes shk{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.fld.shake{animation:shk .32s ease}
+/* ---------- loading: shimmer ---------- */
+.loading{position:relative;min-height:120px}
+.loading>*{visibility:hidden}
+.loading::before{content:"";position:absolute;inset:0;border-radius:12px;visibility:visible;background:linear-gradient(100deg,transparent 25%,rgba(255,255,255,.07) 50%,transparent 75%) 0 0/220% 100%,var(--raise);animation:shim 1.15s linear infinite}
+.loading::after{content:attr(data-load);position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:var(--muted);font-size:13.5px;visibility:visible}
+@keyframes shim{from{background-position:150% 0,0 0}to{background-position:-70% 0,0 0}}
+.reveal{animation:rise .4s ease both}
+
+/* ---------- tonight ---------- */
+.watchwrap{display:flex;flex-direction:column;align-items:center}
+#watch{width:200px;height:auto;display:block}
+#watchbody{transform-origin:120px 150px}
+.ringbuzz1{animation:bz1 .5s ease}.ringbuzz2{animation:bz2 .7s ease}.ringbuzz3{animation:bz3 1.1s ease}
+@keyframes bz1{20%,60%{transform:translateX(-2px)}40%,80%{transform:translateX(2px)}}
+@keyframes bz2{10%,50%,90%{transform:translateX(-3.5px) rotate(-.6deg)}30%,70%{transform:translateX(3.5px) rotate(.6deg)}}
+@keyframes bz3{8%,40%,72%{transform:translateX(-5px) rotate(-1deg)}24%,56%,88%{transform:translateX(5px) rotate(1deg)}}
+.stages{display:flex;flex-direction:column;gap:4px;margin-top:18px;width:100%}
+.stg{display:flex;gap:14px;align-items:center;padding:10px 12px;border-radius:10px;color:var(--dim);font-size:13.5px}
+.stg i{font-style:normal;width:24px;height:24px;border-radius:50%;background:var(--raise);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;transition:all .2s ease}
+.stg b{color:var(--muted);display:block;font-size:13.5px}
+.stg.on{background:var(--cobalt-lo);color:#fff}.stg.on i{background:var(--cobalt);color:#fff}.stg.on b{color:#fff}
+.stg.locked{opacity:.4}
+.room svg{width:100%;height:auto;display:block;border-radius:12px}
+#log{max-height:210px;overflow:auto;font-size:13px;display:flex;flex-direction:column;gap:2px}
+#log div{display:flex;gap:12px;padding:5px 8px;border-radius:6px;animation:rise .25s ease both}
+#log .t{color:var(--dim);font-family:var(--mono);font-size:12px;flex:none;padding-top:1px}
+#log .alarm{color:var(--bad)}#log .light{color:var(--warn)}#log .ok{color:var(--ok)}#log .info{color:var(--muted)}
+.statechip{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:650;margin-top:8px}
+
+/* ---------- misc blocks ---------- */
+.rail{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:22px;counter-reset:s}
+.rail div{position:relative;padding-top:34px;font-size:13.5px;color:var(--muted);line-height:1.5}
+.rail div::before{counter-increment:s;content:counter(s);position:absolute;top:0;left:0;width:24px;height:24px;border-radius:50%;background:var(--cobalt-lo);color:var(--cobalt-hi);font-weight:700;font-size:12px;display:grid;place-items:center}
+.rail b{display:block;color:var(--text);margin-bottom:4px;font-size:14px}
+.wbar{display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:14px;align-items:center;padding:7px 0;font-size:13.5px;color:var(--muted)}
+.wbar .track{height:6px;background:var(--raise);border-radius:6px;position:relative}
+.wbar .track::after{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;width:1px;background:var(--dim)}
+.wbar .fill{position:absolute;top:0;bottom:0;border-radius:6px;transition:all .3s ease}
+.opt{display:grid;grid-template-columns:1fr;gap:4px;padding:18px 20px;border-radius:14px;background:var(--bg);text-align:left;width:100%;position:relative}
+.opt:hover{background:var(--raise);transform:translateY(-2px)}
+.opt:active{transform:scale(.99)}
+.opt.on{background:var(--cobalt-lo);box-shadow:inset 0 0 0 1.5px var(--cobalt)}
+.opt .nm{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.opt .pr{font-size:34px;font-weight:300;letter-spacing:-.02em}
+.opt .pr small{font-size:14px;color:var(--muted);font-weight:500}
+.opt .alt{font-size:13px;color:var(--muted)}
+.opt .pill{position:absolute;top:16px;right:16px;font-size:11px;font-weight:650;letter-spacing:.08em;color:var(--cobalt-hi)}
+.phase .m{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt-hi);font-weight:650;margin-bottom:8px}
+.phase h3{margin-bottom:10px}
+.phase li{color:var(--muted);font-size:13.5px;padding:3px 0}
+.fun{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.frow{display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:center;font-size:13.5px;color:var(--muted)}
+.frow .bar{height:30px;border-radius:8px;display:flex;align-items:center;padding:0 12px;color:#fff;font-weight:600;font-size:13px;min-width:max-content;transition:all .3s ease}
+.tie{font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px}
+.tie.ok{background:rgba(67,211,158,.14);color:var(--ok)}.tie.no{background:rgba(245,184,75,.14);color:var(--warn)}
+.hint{background:var(--bg);border-radius:12px;padding:16px 18px;font-size:14px;color:var(--muted);line-height:1.6}
+.hint b{color:var(--text)}
+.tl{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.tl div{display:grid;grid-template-columns:64px 1fr;gap:12px;font-size:13.5px;padding:7px 10px;border-radius:8px;color:var(--muted)}
+.tl div:hover{background:var(--hover)}
+.tl .t{font-family:var(--mono);color:var(--dim);font-size:12.5px}
+.tl .alarm{color:var(--bad)}.tl .light{color:var(--warn)}.tl .ok{color:var(--ok)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+
+/* presenter + toast */
+#presenter{position:fixed;right:22px;bottom:22px;width:min(380px,calc(100vw - 44px));background:var(--raise2);border-radius:16px;padding:20px 22px;z-index:30;transform:translateY(20px);opacity:0;pointer-events:none;transition:all .25s ease;box-shadow:0 24px 60px -20px rgba(0,0,0,.7)}
+#presenter.on{transform:none;opacity:1;pointer-events:auto}
+#presenter h4{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--cobalt-hi);margin-bottom:8px}
+#presenter p{font-size:14px;color:var(--text);line-height:1.6}
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--raise2);color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:550;opacity:0;pointer-events:none;transition:all .25s ease;z-index:40}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){.split{grid-template-columns:1fr}.rail{grid-template-columns:repeat(3,minmax(0,1fr))}.four{grid-template-columns:repeat(2,minmax(0,1fr))}.work{padding:36px 32px 70px}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:sticky;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px 14px 8px;gap:8px 12px;background:var(--bg)}
+  .brand{padding:0}.brand small{display:none}
+  .navgrp,.sidefoot .lbl,.device,.keys{display:none}
+  .nav{flex-direction:row;overflow-x:auto;order:3;width:100%;gap:4px;padding-bottom:6px}
+  .nav button{width:auto;flex:none;padding:0 14px;height:36px}.nav button svg{display:none}.nav button kbd{display:none}
+  .nav button.on::before{display:none}
+  .sidefoot{margin:0 0 0 auto;flex-direction:row;gap:8px}.sidefoot>div:first-child{display:block}.sidefoot .btn.text{display:none}.side{min-width:0;max-width:100vw}
+  .main{border-radius:20px 20px 0 0;margin:0;min-height:calc(100vh - 110px)}
+  .work{padding:28px 18px 60px}
+  .two,.three{grid-template-columns:1fr;gap:34px}.form{grid-template-columns:1fr}
+  .rail{grid-template-columns:repeat(2,minmax(0,1fr))}.four{grid-template-columns:1fr 1fr}
+  h1{font-size:28px}
+  .frow{grid-template-columns:100px 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.loading::before{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#2f5bff" stroke-width="2.6"/><path d="M5 17h5l3-7 4 13 3-9 2 3h5" fill="none" stroke="#e9ecf2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b>Lucen</b><small>MVP PROTOTYPE · v0.4</small></div>
+    </div>
+    <div class="navgrp">Product</div>
+    <nav class="nav" id="nav" aria-label="Views"></nav>
+    <div class="sidefoot">
+      <div>
+        <span class="lbl">Your plan</span>
+        <div class="seg full" id="tierseg" role="group" aria-label="Plan">
+          <button data-t="free">Free</button><button data-t="core" class="on">Core</button><button data-t="pro">Pro</button>
+        </div>
+      </div>
+      <div class="device"><span class="dot" id="devDot"></span><span id="devTxt">Watch idle · simulated</span></div>
+      <button class="btn text sm" id="presBtn" style="justify-content:flex-start;padding-left:0">Presenter notes <span style="margin-left:8px;font:500 11px var(--mono);color:var(--dim)">P</span></button>
+      <div class="keys" style="font-size:12px;color:var(--dim);line-height:1.6">1 to 7 switch view<br>Space start or pause · R reset</div>
+    </div>
+  </aside>
+
+  <main class="main"><div class="work">
+
+<!-- ================= TONIGHT ================= -->
+<section class="view on" id="v-tonight">
+  <div class="eyebrow">Live prototype</div>
+  <h1>Tonight</h1>
+  <p class="lead">A simulated night, one reading a second from the watch. A body that is still while the heart races is the signature of sleep paralysis. Lucen scores it every second and escalates through three haptic stages.</p>
+  <div class="controls">
+    <div class="tabs" id="scChips" role="group" aria-label="Scenario"></div>
+  </div>
+  <div class="controls">
+    <div class="seg" id="spdseg" role="group" aria-label="Speed"><button data-s="2">2x</button><button data-s="5" class="on">5x</button><button data-s="10">10x</button></div>
+    <label class="sw"><input type="checkbox" id="truthChk"> Show what really happened</label>
+    <label class="sw"><input type="checkbox" id="soundChk" checked> Sound</label>
+    <div class="spacer"></div>
+    <button class="btn text" id="rstBtn">Reset</button>
+    <button class="btn primary" id="goBtn">Start night</button>
+  </div>
+  <div class="split">
+    <div>
+      <div class="plots" id="plots" data-load="Pairing watch and calibrating sensors…">
+        <div class="plotwrap"><div class="pl"><span>Heart rate</span><b id="lv-hr" style="color:var(--hr)"></b></div><canvas class="ch" id="c-hr" style="height:120px"></canvas></div>
+        <div class="plotwrap"><div class="pl"><span>Breathing</span><b id="lv-rr" style="color:var(--resp)"></b></div><canvas class="ch" id="c-rr" style="height:120px"></canvas></div>
+        <div class="plotwrap"><div class="pl"><span>Body movement</span><b id="lv-mv"></b></div><canvas class="ch" id="c-mv" style="height:84px"></canvas></div>
+        <div class="plotwrap"><div class="pl"><span>Lucen onset score</span><b id="lv-sc" style="color:var(--cobalt-hi)"></b></div><canvas class="ch" id="c-sc" style="height:130px"></canvas></div>
+      </div>
+      <div class="gap"></div>
+      <div id="summaryWrap" data-load="Scoring the night…"><div class="metrics" id="summary"></div></div>
+      <div id="proRow" style="margin-top:22px;display:none"><button class="btn" id="csvBtn">Export clinician report (CSV)</button></div>
+    </div>
+    <aside>
+      <div class="surface watchwrap">
+        <svg id="watch" viewBox="0 0 240 300" aria-label="Simulated watch face">
+          <rect x="74" y="0" width="92" height="78" rx="16" fill="#1c2029"/><rect x="74" y="222" width="92" height="78" rx="16" fill="#1c2029"/>
+          <g id="watchbody">
+            <rect x="204" y="118" width="8" height="36" rx="4" fill="#2a3040"/>
+            <rect x="34" y="58" width="172" height="184" rx="48" fill="#07090c"/>
+            <rect id="wring" x="42" y="66" width="156" height="168" rx="42" fill="none" stroke="#6a7285" stroke-width="3" stroke-dasharray="3 5" stroke-linecap="round"/>
+            <text id="wclock" x="120" y="108" text-anchor="middle" font-size="14" fill="#9097a8" font-family="ui-monospace,Menlo,monospace">03:00:00</text>
+            <text id="whr" x="120" y="170" text-anchor="middle" font-size="60" font-weight="300" fill="#e9ecf2" font-family="system-ui,sans-serif">--</text>
+            <text x="120" y="190" text-anchor="middle" font-size="11" fill="#ff8a8f" letter-spacing="2">BPM</text>
+            <text id="wrr" x="120" y="213" text-anchor="middle" font-size="13" fill="#5cc8d7">-- br/min</text>
+          </g>
+        </svg>
+        <div class="statechip" id="stateChip"><span class="dot" id="stateDot"></span><span id="stateTxt">Ready</span></div>
+        <div class="stages" id="stages">
+          <div class="stg" data-i="1"><i>1</i><div><b>Soft double tap</b>first alarm</div></div>
+          <div class="stg" data-i="2"><i>2</i><div><b>Firm pulses</b>after 6 s</div></div>
+          <div class="stg" data-i="3"><i>3</i><div><b>Strong pulses and room</b>after 12 s</div></div>
+        </div>
+      </div>
+      <div class="gap" style="height:28px"></div>
+      <h2>Bedroom</h2>
+      <div class="room">
+        <svg viewBox="0 0 400 210" aria-label="Bedroom with smart light">
+          <defs><radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd58a" stop-opacity=".95"/><stop offset=".5" stop-color="#ffb347" stop-opacity=".35"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient></defs>
+          <rect width="400" height="210" fill="#0b0d11"/><rect y="160" width="400" height="50" fill="#12151b"/>
+          <rect x="24" y="26" width="86" height="64" rx="4" fill="#161a22"/><circle cx="84" cy="48" r="8" fill="#cfd6ea" opacity=".75"/><path d="M67 26v64M24 58h86" stroke="#0b0d11" stroke-width="2"/>
+          <rect x="150" y="104" width="190" height="52" rx="8" fill="#1f2a55"/><rect x="150" y="92" width="62" height="24" rx="10" fill="#dfe4f5" opacity=".85"/>
+          <rect x="196" y="100" width="140" height="42" rx="8" fill="#2a3a7a"/><ellipse cx="175" cy="96" rx="10" ry="9" fill="#cfa98a"/>
+          <rect x="350" y="118" width="32" height="42" rx="3" fill="#1a1f2b"/><rect x="364" y="96" width="4" height="22" fill="#2b3345"/><path d="M352 96h28l-6-16h-16z" fill="#2b3345"/>
+          <circle id="lampglow" cx="366" cy="92" r="92" fill="url(#glow)" opacity="0" style="transition:opacity .6s ease"/>
+        </svg>
+      </div>
+      <div class="note" id="roomNote">Smart lights and partner alerts are on <b>Pro</b>.</div>
+      <div class="note bad" id="partnerNote" style="display:none"><b>Partner alert sent:</b> "Chris may be in a sleep paralysis episode. Tap to check on him."</div>
+      <div class="gap" style="height:28px"></div>
+      <h2>Night log</h2>
+      <div id="log"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= NIGHT LAB ================= -->
+<section class="view" id="v-lab">
+  <div class="eyebrow">Analysis workbench</div>
+  <h1>Night lab</h1>
+  <p class="lead">Describe a sleeper and a night, then run it through the real detector. The form builds a 300 second clip around the resting heart rate and breathing you enter, so the same signal can look very different for a calm sleeper and a restless one.</p>
+  <div class="two" style="grid-template-columns:minmax(0,5fr) minmax(0,6fr)">
+    <div>
+      <h2>Set up a night</h2>
+      <div class="tabs" id="labPresets" style="margin-bottom:24px">
+        <button class="tab" data-p="ep">Typical episode</button><button class="tab" data-p="nm">Nightmare</button><button class="tab" data-p="to">Restless turn-over</button><button class="tab" data-p="nl">Normal night</button>
+      </div>
+      <form class="form" id="labForm" novalidate>
+        <div class="fld wide"><label for="f-name">Sleeper <i>2 to 24 characters</i></label><input id="f-name" name="name" type="text" autocomplete="off" placeholder="e.g. Mira R." value="Mira R." data-label="Sleeper name" data-kind="name" data-req="1"><div class="err"></div></div>
+        <div class="fld"><label for="f-hr">Resting heart rate <i>bpm</i></label><input id="f-hr" name="hr" type="number" step="1" value="58" data-label="Resting heart rate" data-min="40" data-max="90" data-int="1" data-req="1"><div class="err"></div></div>
+        <div class="fld"><label for="f-rr">Resting breathing <i>per min</i></label><input id="f-rr" name="rr" type="number" step="0.5" value="14" data-label="Resting breathing" data-min="8" data-max="24" data-req="1"><div class="err"></div></div>
+        <div class="fld"><label for="f-sc">What happens</label><select id="f-sc" name="sc" data-label="Scenario"></select><div class="err"></div></div>
+        <div class="fld"><label for="f-on">Starts at second <i>60 to 180</i></label><input id="f-on" name="on" type="number" step="1" value="120" data-label="Start second" data-min="60" data-max="180" data-int="1" data-req="1"><div class="err"></div></div>
+        <div class="fld wide"><label for="f-seed">Noise seed <i>optional, makes the run repeatable</i></label><input id="f-seed" name="seed" type="number" step="1" placeholder="Leave blank for a random night" data-label="Noise seed" data-min="1" data-max="999999" data-int="1"><div class="err"></div></div>
+      </form>
+      <div class="formfoot">
+        <button class="btn primary" id="labRun" type="button">Run analysis</button>
+        <span class="note" style="margin:0" id="labPlanNote"></span>
+      </div>
+    </div>
+    <div>
+      <h2>Output</h2>
+      <div id="labOut" data-load="Running the detector over 300 s of signal…"><div class="empty">Nothing yet. Fill in the form and press <b>Run analysis</b>.</div></div>
+    </div>
+  </div>
+  <div class="gap"></div>
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px"><h2 style="margin:0">Session history</h2><div class="spacer"></div><button class="btn text sm" id="labClear">Clear</button><button class="btn sm" id="labCsv">Export all (CSV)</button></div>
+  <div class="tblw"><table id="labHist"></table></div>
+</section>
+
+<!-- ================= DETECTOR ================= -->
+<section class="view" id="v-detector">
+  <div class="eyebrow">Engine</div>
+  <h1>The detector</h1>
+  <p class="lead">Sleep paralysis has an unusual signature: the body is locked still while the heart and breathing race. A nightmare brings twitching and turning over is a short burst of movement. The model separates the three.</p>
+  <div class="rail">
+    <div><b>Watch sensors</b>Heart rate, breathing estimate and motion, once a second</div>
+    <div><b>Rolling window</b>Last 10 to 20 s against the person's own baseline</div>
+    <div><b>Seven features</b>Heart lift, slope, breathing lift, irregularity, movement, stillness</div>
+    <div><b>Onset scorer</b>Logistic model, a score from 0 to 1 each second</div>
+    <div><b>Persistence rule</b>Above threshold for several seconds, then a 2 minute lockout</div>
+    <div><b>Intervention</b>Three haptic stages, lights and partner alert by plan</div>
+  </div>
+  <p class="note">This v0 scorer stands in for the production attention model. It is small enough to run on the watch, which keeps raw biometrics off our servers.</p>
+  <div class="gap"></div>
+  <div class="two">
+    <div>
+      <h2>What the model learned</h2>
+      <div id="weights"></div>
+      <p class="note"><b>Read it like this:</b> a climbing heart rate, irregular breathing and a still body score high. Any burst of movement pulls the score down hard, which is how it ignores you rolling over.</p>
+      <div class="gap" style="height:24px"></div>
+      <div class="hint"><b>The weak spot is the nightmare.</b> Heart rate and breathing spike just like an episode and only the twitching tells them apart. Roughly 1 in 20 simulated nightmares still trigger a buzz. Real labelled nights and sleep-stage context are the fix.</div>
+    </div>
+    <div>
+      <h2>Tune and test</h2>
+      <div class="form" style="grid-template-columns:1fr;gap:22px">
+        <div class="rng"><label>Alarm threshold <b id="thV">0.90</b></label><input type="range" id="thr" min="0.5" max="0.99" step="0.01" value="0.9"></div>
+        <div class="rng"><label>Seconds it must hold <b id="peV">4 s</b></label><input type="range" id="per" min="1" max="10" step="1" value="4"></div>
+      </div>
+      <div class="formfoot"><button class="btn primary" id="evalBtn">Test on 360 fresh nights</button><span class="note" id="evalNote" style="margin:0"></span></div>
+      <div id="evalWrap" data-load="Simulating 360 nights…" style="margin-top:22px"><div class="tblw"><table id="evalTable"></table></div></div>
+      <div id="evalHist" class="note"></div>
+    </div>
+  </div>
+  <div class="gap"></div>
+  <div class="two">
+    <div><h2>What this demo is</h2><ul class="note" style="display:flex;flex-direction:column;gap:8px;margin:0"><li>A working end-to-end MVP: signal stream, onset detection, staged intervention, plan gating and clinician export.</li><li>Real haptics on an Android phone, and a sound cue on a laptop.</li><li>Every business figure here is computed live from the same model as the Assignment IV workbook.</li></ul></div>
+    <div><h2>What it is not yet</h2><ul class="note" style="display:flex;flex-direction:column;gap:8px;margin:0"><li>Not validated on real sleepers. Every signal is simulated.</li><li>Not a medical device. It is positioned as wellness until a clinical study says otherwise.</li><li>The wake-up delay is an assumption the pilot will measure.</li></ul></div>
+  </div>
+  <div class="gap"></div>
+  <h2>Next 90 days: from simulation to evidence</h2>
+  <div class="four">
+    <div class="phase"><div class="m">Weeks 1 to 3</div><h3>Recruit and consent</h3><ul><li>30 people who report sleep paralysis</li><li>Ethics review and consent</li></ul></div>
+    <div class="phase"><div class="m">Weeks 3 to 8</div><h3>Collect real nights</h3><ul><li>Watch data plus a diary</li><li>Loaner watches</li></ul></div>
+    <div class="phase"><div class="m">Weeks 6 to 10</div><h3>Annotate and retrain</h3><ul><li>Technician labels the nights</li><li>Real labels replace simulation</li></ul></div>
+    <div class="phase"><div class="m">Weeks 10 to 13</div><h3>Measure what matters</h3><ul><li>Real detection delay</li><li>Real false-alarm rate</li></ul></div>
+  </div>
+</section>
+
+<!-- ================= MARKET ================= -->
+<section class="view" id="v-market">
+  <div class="eyebrow">Module 1 · Competition</div>
+  <h1>Where Lucen sits</h1>
+  <p class="lead">Most sleep products report on the night afterwards or sell calm beforehand. The one product that acts during the night is a prescription device for a different condition.</p>
+  <div class="two" style="grid-template-columns:minmax(0,7fr) minmax(0,5fr)">
+    <div><h2>Positioning map</h2><div id="posmap"></div><p class="note">First-year cost to the user, log scale. Oura counted as ring plus one year of membership. NightWare at its commonly quoted price level. Hover a product in the table to find it here.</p></div>
+    <div>
+      <h2>Positioning statement</h2>
+      <p style="font-size:21px;line-height:1.42;letter-spacing:-.01em;font-weight:400;margin-bottom:30px">For people who wake up unable to move, Lucen is the sleep-paralysis interrupter that runs on the watch they already own. It acts in the first seconds of an episode, not the morning after.</p>
+      <h2>Riskiest assumptions</h2>
+      <div class="tblw"><table><tbody>
+        <tr><td><b>Detection works on real sleepers</b></td><td class="mutedtd">30-person pilot</td></tr>
+        <tr><td><b>People wake within about 15 s</b></td><td class="mutedtd">Measured in the pilot</td></tr>
+        <tr><td><b>2.5% of installs pay</b></td><td class="mutedtd">Waitlist, then launch funnel</td></tr>
+        <tr><td><b>An install costs about ₹50</b></td><td class="mutedtd">Creator pilots</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>
+  <div class="gap"></div>
+  <h2>Side by side</h2>
+  <div class="tblw"><table id="cmpTable"></table></div>
+  <div class="gap"></div>
+  <h2>Moat</h2>
+  <div class="three">
+    <div><h3>A dataset nobody else has</h3><p class="note">Consented, labelled sleep-paralysis nights, growing with every user.</p></div>
+    <div><h3>A model that personalises</h3><p class="note">It improves per user as their own baseline builds.</p></div>
+    <div><h3>Switching cost</h3><p class="note">Months of personal history and tuned thresholds stay behind if they leave.</p></div>
+  </div>
+</section>
+
+<!-- ================= PLANS ================= -->
+<section class="view" id="v-plans">
+  <div class="eyebrow">Module 2 · Revenue</div>
+  <h1>Plans and pricing</h1>
+  <p class="lead">A free tier earns trust with tracking. The first paid tier is the core promise: real-time detection and wake-up. Pro adds what a partner or a clinician cares about. Pick a plan and the rest of this prototype changes with it.</p>
+  <div class="three" id="plans" style="gap:18px"></div>
+  <div class="gap"></div>
+  <div class="two">
+    <div><h2>What each plan unlocks</h2><div class="tblw"><table id="matrix"></table></div>
+      <div class="gap" style="height:22px"></div>
+      <div class="hint"><b>Try it.</b> Pick Free, open Tonight and run an episode. Lucen logs it but cannot intervene. Switch to Core and the same night gets haptics. Switch to Pro and the room lights come up too. That gap is the upgrade path.</div></div>
+    <div><h2>What one paying customer is worth</h2>
+      <div class="form" style="grid-template-columns:1fr;gap:20px" id="mixSliders"></div>
+      <div class="gap" style="height:22px"></div>
+      <div class="tblw"><table id="unitTable"></table></div></div>
+  </div>
+  <div class="gap"></div>
+  <h2>Revenue calculator</h2>
+  <p class="note" style="margin:-6px 0 22px">Enter a customer base and a plan mix. Prices, store fees and serving costs come from the finance model.</p>
+  <form class="form" id="revForm" novalidate style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="fld"><label for="r-users">Paying users</label><input id="r-users" type="number" value="1400" step="1" data-label="Paying users" data-min="1" data-max="1000000" data-int="1" data-req="1"><div class="err"></div></div>
+    <div class="fld"><label for="r-ann">On annual plans <i>%</i></label><input id="r-ann" type="number" value="65" step="1" data-label="Annual share" data-min="0" data-max="100" data-req="1"><div class="err"></div></div>
+    <div class="fld"><label for="r-pro">On Pro <i>%</i></label><input id="r-pro" type="number" value="20" step="1" data-label="Pro share" data-min="0" data-max="100" data-req="1"><div class="err"></div></div>
+  </form>
+  <div class="formfoot"><button class="btn primary" id="revRun" type="button">Calculate</button></div>
+  <div id="revOut" data-load="Crunching the unit economics…" style="margin-top:28px"><div class="metrics" id="revMetrics"></div></div>
+</section>
+
+<!-- ================= GROWTH ================= -->
+<section class="view" id="v-growth">
+  <div class="eyebrow">Module 3 · Marketing and sales</div>
+  <h1>Growth plan</h1>
+  <p class="lead">Start where sufferers already talk, prove it with a pilot, launch to a waitlist and only then scale paid acquisition. The spend schedule below is the same one that drives the finance model.</p>
+  <div class="four">
+    <div class="phase"><div class="m">Months 1 to 2</div><h3>Listen</h3><ul><li>30 sufferer interviews</li><li>Reddit and Discord communities</li><li>Waitlist page live</li></ul></div>
+    <div class="phase"><div class="m">Months 3 to 4</div><h3>Prove</h3><ul><li>Pilot with 30 participants</li><li>Sleep-lab conversations</li><li>Launch content and webinar</li></ul></div>
+    <div class="phase"><div class="m">Months 4 to 12</div><h3>Launch</h3><ul><li>Waitlist converts at launch</li><li>Creator and community partners</li><li>Spend ramps ₹15k a month</li></ul></div>
+    <div class="phase"><div class="m">Months 13 to 48</div><h3>Scale</h3><ul><li>Spend capped at ₹3 lakh a month</li><li>Annual renewals compound</li><li>Referral loop for partners</li></ul></div>
+  </div>
+  <div class="gap"></div>
+  <div class="two">
+    <div><h2>Spend and what it buys</h2><canvas class="ch" id="c-gtm" style="height:240px"></canvas>
+      <div class="rng" style="margin-top:14px"><label>Look at month <b id="gtmMonthV">12</b></label><input type="range" id="gtmMonth" min="4" max="48" value="12"></div></div>
+    <div><h2>The funnel in that month</h2><div class="fun" id="funnel"></div><p class="note" id="funnelNote"></p></div>
+  </div>
+  <div class="gap"></div>
+  <h2>Launch funnel calculator</h2>
+  <p class="note" style="margin:-6px 0 22px">Try your own acquisition numbers and see whether the unit economics survive.</p>
+  <form class="form" id="gtmForm" novalidate style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="fld"><label for="g-bud">Monthly budget <i>₹</i></label><input id="g-bud" type="number" value="150000" step="1000" data-label="Monthly budget" data-min="5000" data-max="5000000" data-req="1"><div class="err"></div></div>
+    <div class="fld"><label for="g-cpi">Cost per install <i>₹</i></label><input id="g-cpi" type="number" value="50" step="1" data-label="Cost per install" data-min="5" data-max="1000" data-req="1"><div class="err"></div></div>
+    <div class="fld"><label for="g-conv">Install to paid <i>%</i></label><input id="g-conv" type="number" value="2.5" step="0.1" data-label="Conversion" data-min="0.1" data-max="20" data-req="1"><div class="err"></div></div>
+  </form>
+  <div class="formfoot"><button class="btn primary" id="gtmRun" type="button">Run funnel</button></div>
+  <div id="gtmOut" data-load="Running the funnel…" style="margin-top:28px"><div class="metrics" id="gtmMetrics"></div></div>
+</section>
+
+<!-- ================= FINANCE ================= -->
+<section class="view" id="v-finance">
+  <div class="eyebrow">Module 4 · Financial plan</div>
+  <h1>Finance</h1>
+  <p class="lead">The Assignment IV workbook, running live. Move an assumption and the funding ask, the cash low point and the break-even month all move with it.</p>
+  <div class="controls">
+    <div class="seg" id="presets" role="group" aria-label="Scenario"><button data-p="base" class="on">Base case</button><button data-p="stress">Stress test</button><button data-p="up">Upside</button></div>
+    <span class="tie ok" id="tie"></span>
+  </div>
+  <div id="kpiWrap" data-load="Recomputing 48 months…"><div class="metrics" id="kpis"></div></div>
+  <div class="gap"></div>
+  <div class="four" id="bizSliders" style="gap:28px"></div>
+  <div class="gap"></div>
+  <div id="chartWrap" data-load="Recomputing 48 months…">
+    <div class="two">
+      <div><h2>Cumulative cash (₹ lakh)</h2><canvas class="ch" id="c-cash" style="height:270px"></canvas></div>
+      <div><h2>Monthly operating profit (₹ lakh)</h2><canvas class="ch" id="c-op" style="height:270px"></canvas></div>
+    </div>
+  </div>
+  <p class="note" id="bizNote"></p>
+</section>
+
+  </div></main>
+</div>
+<div id="presenter" role="note"><h4 id="presH">Say this</h4><p id="presP"></p></div>
+<div id="toast" role="status"></div>
+
+<script>// Lucen detection engine v0.1: simulator, features, logistic onset scorer, streaming detector.
+// Works in Node and in the browser. All data here is SIMULATED.
+(function (root) {
+  function rng(seed) { let a = seed >>> 0; return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0, v = 0; while (u === 0) u = r(); while (v === 0) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const smooth = (x) => x * x * (3 - 2 * x); // 0..1 ease
+
+  const LEN = 300; // seconds per clip
+  const SCENARIOS = ['normal', 'rem', 'episode', 'nightmare', 'turnover', 'quietwake'];
+
+  // Generate one clip at 1 Hz. Returns {hr,resp,mv,t0,tEnd,type}
+  function generate(type, seed, opt) {
+    opt = opt || {};
+    const r = rng(seed);
+    const hrB0 = 54 + r() * 12, respB0 = 12.5 + r() * 3.5; const hrBase = opt.hrBase || hrB0, respBase = opt.respBase || respB0;
+    const hr = new Array(LEN), resp = new Array(LEN), mv = new Array(LEN);
+    let hrN = 0, rN = 0;
+    const remAmp = type === 'rem' ? 1.0 + r() * 0.8 : 0.3;
+    let t0 = -1, tEnd = -1;
+    let dHR = 0, dResp = 0, respCVboost = 0, moveLevel = 0;
+    const onset = opt.onset || (95 + Math.floor(r() * 60));
+    let dur = 0, magHR = 0, magResp = 0;
+    if (type === 'episode') { t0 = onset; dur = 45 + Math.floor(r() * 80); tEnd = t0 + dur; magHR = 5 + r() * 26; magResp = 2 + r() * 10; }
+    if (type === 'nightmare') { t0 = onset; dur = 25 + Math.floor(r() * 35); tEnd = t0 + dur; magHR = 10 + r() * 22; magResp = 4 + r() * 8; }
+    if (type === 'turnover') { t0 = onset; dur = 4 + Math.floor(r() * 4); tEnd = t0 + dur; magHR = 3 + r() * 9; magResp = 1 + r() * 3; }
+    if (type === 'quietwake') { t0 = onset; dur = 60 + Math.floor(r() * 80); tEnd = t0 + dur; magHR = 5 + r() * 12; magResp = 1.5 + r() * 4.5; }
+    if (type === 'rem') { t0 = onset; dur = 80 + Math.floor(r() * 60); tEnd = t0 + dur; }
+    for (let t = 0; t < LEN; t++) {
+      hrN = 0.85 * hrN + gauss(r) * (0.6 + remAmp * 0.7);
+      rN = 0.85 * rN + gauss(r) * 0.25;
+      let h = 0, rs = 0, m = Math.max(0, gauss(r) * 0.02 + (r() < 0.01 ? 0.12 + r() * 0.1 : 0));
+      let cv = 0.06 + (type === 'rem' ? 0.05 : 0);
+      const inEv = t0 >= 0 && t >= t0 && t < tEnd + 20;
+      if (type === 'episode' && inEv) {
+        const up = smooth(clamp((t - t0) / (6 + r() * 0.01), 0, 1)), down = t > tEnd ? 1 - smooth(clamp((t - tEnd) / 20, 0, 1)) : 1;
+        h = magHR * up * down; rs = magResp * up * down; cv += 0.22 * up * down;
+        m = t < tEnd ? Math.max(0, gauss(r) * 0.015) : (t < tEnd + 4 ? 0.7 + r() * 0.3 : m * 3 + 0.05);
+      }
+      if (type === 'nightmare' && inEv) {
+        const up = smooth(clamp((t - t0) / 8, 0, 1)), down = t > tEnd ? 1 - smooth(clamp((t - tEnd) / 20, 0, 1)) : 1;
+        h = magHR * up * down; rs = magResp * up * down; cv += 0.12 * up * down;
+        const twitch = t < tEnd ? (r() < 0.35 ? 0.25 + r() * 0.5 : 0.05) : (t < tEnd + 6 ? 0.6 + r() * 0.4 : 0.1);
+        m = twitch * (t > t0 + 4 ? 1 : 0.2);
+      }
+      if (type === 'turnover' && t >= t0 && t < tEnd + 12) {
+        const up = t < tEnd ? 1 : 1 - smooth(clamp((t - tEnd) / 12, 0, 1));
+        h = magHR * up; rs = magResp * up; m = t < tEnd ? 0.6 + r() * 0.4 : m + 0.05 * up;
+      }
+      if (type === 'quietwake' && inEv) {
+        const up = smooth(clamp((t - t0) / 25, 0, 1)), down = t > tEnd ? 1 - smooth(clamp((t - tEnd) / 25, 0, 1)) : 1;
+        h = magHR * up * down; rs = magResp * up * down; cv += 0.05 * up * down;
+        m = Math.max(0, 0.03 * up * down + gauss(r) * 0.02 + (r() < 0.05 ? 0.15 : 0));
+      }
+      if (type === 'rem' && inEv) {
+        const k = Math.sin(((t - t0) / dur) * Math.PI);
+        h = 4 * k * Math.sin(t / 6); rs = 1.4 * k * Math.sin(t / 4 + 1); cv += 0.04 * k; m = m + (r() < 0.04 ? 0.08 : 0);
+      }
+      hr[t] = Math.round((hrBase + hrN + h + gauss(r) * 0.9) * 10) / 10;
+      const respMean = respBase + rN + rs;
+      resp[t] = Math.round((respMean + gauss(r) * respMean * cv) * 10) / 10;
+      mv[t] = Math.round(clamp(m, 0, 1) * 1000) / 1000;
+    }
+    return { type, hr, resp, mv, t0, tEnd, len: LEN };
+  }
+
+  const median = (a) => { const s = a.slice().sort((x, y) => x - y); const n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+  const mean = (a) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
+  const std = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((x) => (x - m) * (x - m)))); };
+  const FEATS = ['dHR', 'slopeHR', 'dResp', 'respCV', 'moveMean', 'moveMax', 'still'];
+
+  // Features at time t (needs t>=40) from arrays up to and including t.
+  function features(hr, resp, mv, t) {
+    const lo = Math.max(0, t - 240), hi = Math.max(lo + 30, t - 30);
+    const baseHR = median(hr.slice(lo, hi)), baseR = median(resp.slice(lo, hi));
+    const h10 = hr.slice(t - 9, t + 1), r10 = resp.slice(t - 9, t + 1);
+    const r20 = resp.slice(t - 19, t + 1), m15 = mv.slice(t - 14, t + 1);
+    const slope = (mean(hr.slice(t - 5, t + 1)) - mean(hr.slice(t - 17, t - 11))) / 12;
+    return [mean(h10) - baseHR, slope, mean(r10) - baseR, std(r20) / (mean(r20) || 1), mean(m15), Math.max.apply(null, m15), m15.filter((x) => x < 0.1).length / 15];
+  }
+
+  function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+  function score(model, f) { let z = model.b; for (let i = 0; i < f.length; i++) z += model.w[i] * ((f[i] - model.mu[i]) / model.sd[i]); return sigmoid(z); }
+
+  function trainModel(seedBase, nPerType) {
+    const X = [], Y = [];
+    const mix = { normal: 1, rem: 1, episode: 2, nightmare: 1, turnover: 1, quietwake: 1 };
+    let s = seedBase;
+    SCENARIOS.forEach((ty) => {
+      const n = nPerType * mix[ty];
+      for (let k = 0; k < n; k++) {
+        const c = generate(ty, s++);
+        for (let t = 45; t < LEN; t += 2) {
+          const pos = ty === 'episode' && t >= c.t0 + 8 && t <= c.t0 + 28;
+          X.push(features(c.hr, c.resp, c.mv, t)); Y.push(pos ? 1 : 0);
+        }
+      }
+    });
+    const d = FEATS.length, n = X.length;
+    const mu = [], sd = [];
+    for (let j = 0; j < d; j++) { const col = X.map((x) => x[j]); mu.push(mean(col)); sd.push(std(col) || 1); }
+    const Z = X.map((x) => x.map((v, j) => (v - mu[j]) / sd[j]));
+    const w = new Array(d).fill(0); let b = 0;
+    const pos = Y.reduce((a, y) => a + y, 0), wPos = (n - pos) / pos * 0.6, wNeg = 1;
+    for (let it = 0; it < 1500; it++) {
+      const gw = new Array(d).fill(0); let gb = 0;
+      for (let i = 0; i < n; i++) {
+        let z = b; for (let j = 0; j < d; j++) z += w[j] * Z[i][j];
+        const p = sigmoid(z), wt = Y[i] ? wPos : wNeg, e = (p - Y[i]) * wt;
+        for (let j = 0; j < d; j++) gw[j] += e * Z[i][j]; gb += e;
+      }
+      const lr = 0.4 / n;
+      for (let j = 0; j < d; j++) w[j] -= lr * (gw[j] + 0.02 * w[j] * n * 0.01); b -= lr * gb;
+    }
+    return { w, b, mu, sd, feats: FEATS, nTrain: n, nPos: pos };
+  }
+
+  // Streaming detector: call push() once per second.
+  function Detector(model, cfg) {
+    cfg = cfg || {};
+    this.model = model; this.thr = cfg.threshold || 0.8; this.k = cfg.persist || 4; this.lock = cfg.lockout || 120;
+    this.hr = []; this.resp = []; this.mv = []; this.run = 0; this.lockUntil = -1; this.t = -1;
+  }
+  Detector.prototype.push = function (h, r, m) {
+    this.hr.push(h); this.resp.push(r); this.mv.push(m); this.t++;
+    const t = this.t; if (t < 45) return { t, score: 0, alarm: false, f: null };
+    const f = features(this.hr, this.resp, this.mv, t), sc = score(this.model, f);
+    this.run = sc >= this.thr ? this.run + 1 : 0;
+    let alarm = false;
+    if (this.run >= this.k && t >= this.lockUntil) { alarm = true; this.lockUntil = t + this.lock; }
+    return { t, score: sc, alarm, f };
+  };
+
+  function evaluate(model, seedBase, nPer, cfg) {
+    const out = {}; let s = seedBase;
+    SCENARIOS.forEach((ty) => {
+      let fa = 0, hit = 0, n = nPer, lat = [];
+      for (let k = 0; k < n; k++) {
+        const c = generate(ty, s++); const d = new Detector(model, cfg); let first = -1;
+        for (let t = 0; t < LEN; t++) { const o = d.push(c.hr[t], c.resp[t], c.mv[t]); if (o.alarm && first < 0) first = t; }
+        if (ty === 'episode') { if (first >= c.t0 && first <= c.t0 + 40) { hit++; lat.push(first - c.t0); } else if (first >= 0 && first < c.t0) fa++; }
+        else if (first >= 0) fa++;
+      }
+      out[ty] = { n, hit, fa, hitRate: hit / n, faRate: fa / n, medLatency: lat.length ? median(lat) : null, p90Latency: lat.length ? lat.sort((a, b) => a - b)[Math.floor(lat.length * 0.9)] : null };
+    });
+    return out;
+  }
+
+  const api = { rng, generate, features, score, trainModel, Detector, evaluate, SCENARIOS, LEN, FEATS };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.LucenEngine = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>// JS port of Lucen_Assignment_IV_Financial_Model.xlsx (same inputs, same formulas).
+(function (root) {
+  const BASE = { fx: 95, coreM: 9.99, coreA: 89, proM: 16.99, proA: 149, shAnnual: 0.65, shPro: 0.20, realize: 0.89, plat: 0.15, pay: 0.01, cloud: 70, freeAlloc: 35, conv: 0.025, cpi: 50, annRenew: 0.30, monChurn: 0.15, load: 0.10, launchInst: 2500, mktBase: 60000, mktStep: 15000, mktCap: 300000, contingency: 0.15, roundTo: 500000, apple: 9400 };
+  const ONE = [[25000,1],[45000,2],[40000,3],[30000,2],[15000,1],[25000,1],[60000,2],[10000,1],[30000,1],[35000,2],[40000,3],[30000,3],[90000,1],[40000,1],[80000,1],[40000,1],[175000,1],[15000,2],[11780,1],[30000,1],[100000,4],[25000,4],[20000,4],[60000,4],[30000,4],[50000,4]];
+  const PEOPLE = [[1,40000,1],[1,70000,1],[1,65000,1],[1,15000,0],[2,20000,0],[3,25000,1],[8,18000,1],[9,70000,1]];
+  const OVER = [[1,36000],[1,18000],[1,35000],[1,12000],[1,5000],[2,5000],[2,25000]];
+  function unit(p) {
+    const coreMo = p.shAnnual * p.coreA / 12 * p.fx + (1 - p.shAnnual) * p.coreM * p.fx;
+    const proMo = p.shAnnual * p.proA / 12 * p.fx + (1 - p.shAnnual) * p.proM * p.fx;
+    const blend = (1 - p.shPro) * coreMo + p.shPro * proMo;
+    const arpu = Math.round(blend * p.realize / 10) * 10;
+    const fees = arpu * (p.plat + p.pay), serve = p.cloud + p.freeAlloc, gp = arpu - fees - serve;
+    const life = p.shAnnual * 12 / (1 - p.annRenew) + (1 - p.shAnnual) / p.monChurn;
+    const cac = p.cpi / p.conv, ltv = gp * life;
+    return { coreMo, proMo, blend, arpu, fees, serve, gp, gm: gp / arpu, life, churn: 1 / life, cac, ltv, ltvCac: ltv / cac, payback: cac / gp };
+  }
+  function run(over) {
+    const p = Object.assign({}, BASE, over || {}), u = unit(p), N = 48, rows = [];
+    let stock = 0, cum = 0, prevMkt = 0;
+    for (let m = 1; m <= N; m++) {
+      const mkt = m < 5 ? 0 : Math.min(p.mktBase + p.mktStep * (m - 5), p.mktCap);
+      const inst = m < 4 ? 0 : (m === 4 ? p.launchInst : mkt / p.cpi);
+      const nw = inst * p.conv; stock = (m === 1 ? 0 : stock * (1 - u.churn)) + nw;
+      const rev = stock * u.arpu, fees = rev * (p.plat + p.pay), cloud = stock * (p.cloud + p.freeAlloc), gp = rev - fees - cloud;
+      let ppl = 0; PEOPLE.forEach((x) => { if (x[0] <= m) ppl += x[1] * (1 + p.load * x[2]); });
+      let ov = 0; OVER.forEach((x) => { if (x[0] <= m) ov += x[1]; });
+      if (m >= 13 && (m - 13) % 12 === 0) ov += p.apple;
+      let one = 0; ONE.forEach((x) => { if (x[1] === m) one += x[0]; });
+      const op = gp - ppl - ov - mkt, net = op - one; cum += net;
+      rows.push({ m, inst, nw, stock, rev, fees, cloud, gp, ppl, ov, mkt, one, op, net, cum });
+    }
+    let low = rows[0]; rows.forEach((r) => { if (r.cum < low.cum) low = r; });
+    let be = null; for (let i = 0; i < N; i++) { if (rows[i].op > 0 && (i + 1 >= 5)) { be = rows[i].m; break; } }
+    const peak = -low.cum, total = peak * (1 + p.contingency), ask = Math.ceil(total / p.roundTo) * p.roundTo;
+    const cumPos = (() => { for (let i = low.m; i < N; i++) if (rows[i].cum >= 0) return rows[i].m; return null; })();
+    return { p, u, rows, peak, lowMonth: low.m, total, ask, breakEven: be, cumPositive: cumPos, endUsers: rows[N - 1].stock, endRev: rows[N - 1].rev, endOp: rows[N - 1].op };
+  }
+  const api = { BASE, run, unit };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.LucenFinance = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>window.LUCEN_MODEL={"w":[0.3175282833774781,1.103462486933544,0.45657160585908757,1.3968565082683253,-1.5390710184885956,-1.9642644694850473,0.7563034046555697],"b":-4.977390715928667,"mu":[2.4067003348214326,0.000450458829365079,0.9369561011904853,0.10345578508441973,0.026110943700397085,0.10859095982142511,0.9582328869048303],"sd":[7.40683509263684,0.3476976820235855,2.6493209200394077,0.07057847831282915,0.05993884299914799,0.1965696217768088,0.12219458605670731],"feats":["dHR","slopeHR","dResp","respCV","moveMean","moveMax","still"],"nTrain":53760,"nPos":1262};window.LUCEN_EVAL0={"normal":{"hitRate":0,"faRate":0,"medLatency":null},"rem":{"hitRate":0,"faRate":0.001,"medLatency":null},"episode":{"hitRate":0.953,"faRate":0,"medLatency":10},"nightmare":{"hitRate":0,"faRate":0.052,"medLatency":null},"turnover":{"hitRate":0,"faRate":0,"medLatency":null},"quietwake":{"hitRate":0,"faRate":0,"medLatency":null}};</script>
+<script>(function () {
+'use strict';
+const E = window.LucenEngine, F = window.LucenFinance, MODEL = window.LUCEN_MODEL;
+const CFG = { thr: 0.9, persist: 4 }, LOCK = 120;
+const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const css = getComputedStyle(document.documentElement);
+const C = (n) => css.getPropertyValue('--' + n).trim();
+const pad = (n) => (n < 10 ? '0' : '') + n;
+const clock = (t) => { const s = 3 * 3600 + t; return pad(Math.floor(s / 3600) % 24) + ':' + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60); };
+const inr = (v) => { const a = Math.abs(v), s = v < 0 ? '-' : ''; if (a >= 1e7) return s + '₹' + (a / 1e7).toFixed(2) + ' cr'; if (a >= 1e5) return s + '₹' + (a / 1e5).toFixed(1) + ' lakh'; return s + '₹' + Math.round(a).toLocaleString('en-IN'); };
+const inrFull = (v) => '₹' + Math.round(v).toLocaleString('en-IN');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove('on'), 2600); }
+
+/* ---------- loading helpers: spinner on the control, shimmer on the output ---------- */
+function loadOn(el, on) { if (el) el.classList.toggle('loading', on); }
+function busyBtn(btn, label) { const h = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span>' + label; return () => { btn.disabled = false; btn.innerHTML = h; }; }
+function reveal(el) { el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal'); }
+function withLoading(o) {
+  const un = o.btn ? busyBtn(o.btn, o.label || 'Working') : null; (o.els || []).forEach((e) => loadOn(e, true));
+  setTimeout(() => { let r, err; try { r = o.work(); } catch (e) { err = e; console.error(e); }
+    (o.els || []).forEach((e) => { loadOn(e, false); reveal(e); }); if (un) un(); if (o.done && !err) o.done(r); }, o.ms || 700);
+}
+
+/* ---------- canvas plot ---------- */
+function plot(cv, o) {
+  if (!cv) return; const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const L = o.padL || 40, R = o.padR || 18, T = o.padT == null ? 8 : o.padT, B = o.padB || 20, pw = w - L - R, ph = h - T - B;
+  const X = (x) => L + (x - o.xmin) / (o.xmax - o.xmin) * pw, Y = (y) => T + ph - (y - o.ymin) / (o.ymax - o.ymin) * ph;
+  g.font = '11.5px system-ui,sans-serif'; g.textBaseline = 'middle';
+  (o.bands || []).forEach((b) => { g.fillStyle = b.color; g.fillRect(X(b.x0), T, X(b.x1) - X(b.x0), ph); if (b.label) { g.fillStyle = b.text || C('muted'); g.textAlign = 'left'; g.fillText(b.label, X(b.x0) + 6, T + 10); } });
+  const yt = o.yticks || [o.ymin, (o.ymin + o.ymax) / 2, o.ymax];
+  g.strokeStyle = 'rgba(255,255,255,.06)'; g.fillStyle = C('dim'); g.textAlign = 'right'; g.lineWidth = 1;
+  yt.forEach((v) => { g.beginPath(); g.moveTo(L, Math.round(Y(v)) + .5); g.lineTo(L + pw, Math.round(Y(v)) + .5); g.stroke(); g.fillText(o.fmtY ? o.fmtY(v) : v, L - 8, Y(v)); });
+  g.textAlign = 'center'; (o.xticks || []).forEach((v) => { g.fillText(o.fmtX ? o.fmtX(v) : v, X(v), T + ph + 12); });
+  if (o.zero !== undefined) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.moveTo(L, Y(o.zero)); g.lineTo(L + pw, Y(o.zero)); g.stroke(); }
+  (o.layers || []).forEach((ly) => {
+    const d = ly.data; if (!d || !d.length) return;
+    if (ly.type === 'bar') { const bw = Math.max(2, pw / (o.xmax - o.xmin + 1) * 0.66); d.forEach((p) => { if (p[1] == null) return; const y0 = Y(0), y1 = Y(p[1]); g.fillStyle = ly.colorFn ? ly.colorFn(p[1]) : ly.color; g.fillRect(X(p[0]) - bw / 2, Math.min(y0, y1), bw, Math.max(1, Math.abs(y1 - y0))); }); return; }
+    g.beginPath(); let st = false;
+    d.forEach((p) => { if (p[1] == null) { st = false; return; } const x = X(p[0]), y = Y(Math.max(o.ymin, Math.min(o.ymax, p[1]))); if (!st) { g.moveTo(x, y); st = true; } else g.lineTo(x, y); });
+    g.lineWidth = ly.width || 2; g.strokeStyle = ly.color; g.lineJoin = 'round'; g.stroke();
+    if (ly.fill) { const last = d.filter((p) => p[1] != null); if (last.length) { g.lineTo(X(last[last.length - 1][0]), Y(o.ymin)); g.lineTo(X(last[0][0]), Y(o.ymin)); g.closePath(); g.fillStyle = ly.fill; g.fill(); } }
+  });
+  (o.hlines || []).forEach((hl) => { g.setLineDash([5, 4]); g.strokeStyle = hl.color; g.lineWidth = 1.2; g.beginPath(); g.moveTo(L, Y(hl.y)); g.lineTo(L + pw, Y(hl.y)); g.stroke(); g.setLineDash([]); if (hl.label) { g.fillStyle = hl.color; g.textAlign = 'right'; g.fillText(hl.label, L + pw - 4, Y(hl.y) - 8); } });
+  (o.vlines || []).forEach((vl) => { g.strokeStyle = vl.color; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(vl.x), T); g.lineTo(X(vl.x), T + ph); g.stroke(); if (vl.label) { g.fillStyle = vl.color; g.textAlign = vl.left ? 'right' : 'left'; g.fillText(vl.label, X(vl.x) + (vl.left ? -6 : 6), T + 10 + (vl.dy || 0)); } });
+  (o.dots || []).forEach((d) => { g.fillStyle = d.color; g.beginPath(); g.arc(X(d.x), Y(d.y), 4.5, 0, 7); g.fill(); if (d.label) { g.fillStyle = d.color; g.textAlign = d.left ? 'right' : 'left'; g.fillText(d.label, X(d.x) + (d.left ? -9 : 9), Y(d.y) + (d.dy || 0)); } });
+}
+
+/* ---------- shell: views ---------- */
+const ICON = {
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>', flask: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3"/>', pulse: '<path d="M3 12h4l2.5-7 5 14 2.5-7h4"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>', tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>', trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>', bars: '<path d="M5 20V10M12 20V4M19 20v-7"/>'
+};
+const TABS = [['tonight', 'Tonight', 'moon'], ['lab', 'Night lab', 'flask'], ['detector', 'Detector', 'pulse'], ['market', 'Market', 'target'], ['plans', 'Plans', 'tag'], ['growth', 'Growth', 'trend'], ['finance', 'Finance', 'bars']];
+const PRES = {
+  tonight: ['Start with the product', 'This is a simulated night, one reading a second from the watch. Watch the heart rate climb while movement goes flat: a still body with a racing heart is the signature. Lucen fires within about ten seconds, the watch buzzes in three stages, and on Pro the room lights come up and a partner is alerted. Try the mystery night and let someone guess what it is.'],
+  lab: ['Show it is not hard-coded', 'Change the sleeper, the resting numbers and the scenario, then press Run analysis. The real detector runs over a fresh 300 second clip and the output is different every time. Note the validation: try a heart rate of 300 and see it refuse. Be upfront that signals are simulated, so this proves the pipeline, not accuracy on real sleepers.'],
+  detector: ['Show the weak spot', 'Drag the threshold down and run the test: more episodes are caught but nightmares start triggering. Drag it up and the reverse happens. That trade-off is exactly what the pilot has to settle with real nights. Our shipped setting is 0.90 held for 4 seconds.'],
+  market: ['Module 1: competition and positioning', 'Reports after the night, content before the night, or a prescription device for a different condition. Nobody offers real-time interruption of sleep paralysis on the watch you already own. That empty corner is where Lucen sits, and the dataset is the moat.'],
+  plans: ['Module 2: revenue model', 'Click Free, Core and Pro and note the demo changes behaviour: that is the pricing. One paying customer is worth about ₹800 a month in revenue and ₹567 in gross profit after fees and serving costs. Use the calculator to size a customer base.'],
+  growth: ['Module 3: marketing and sales', 'Listen, prove, launch, scale. Drag the month slider: spend, installs and paying users come from the same schedule as the finance model. Blended cost per paying customer is ₹2,000 and each returns about 3.8 times that in lifetime gross profit. Try a worse cost per install in the calculator.'],
+  finance: ['Module 4: financial plan', 'This is the Assignment IV workbook running live. Base case: we need ₹1.1 crore, cash bottoms out in month 26, and monthly profit turns positive in month 27. Press Stress test: at 1.5% conversion and ₹80 an install the ask jumps to ₹2.75 crore and we never break even, so we know exactly what breaks first.']
+};
+const nav = $('#nav');
+TABS.forEach((t, i) => {
+  if (t[0] === 'market') { const g = document.createElement('div'); g.className = 'navgrp'; g.textContent = 'Business'; nav.appendChild(g); }
+  const b = document.createElement('button'); b.dataset.tab = t[0]; b.type = 'button';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[t[2]] + '</svg><span>' + t[1] + '</span><kbd>' + (i + 1) + '</kbd>';
+  b.onclick = () => showTab(t[0]); nav.appendChild(b);
+});
+function showTab(id) {
+  if (!TABS.some((t) => t[0] === id)) id = 'tonight';
+  $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + id));
+  $$('#nav button').forEach((b) => { const on = b.dataset.tab === id; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  $('#presH').textContent = PRES[id][0]; $('#presP').textContent = PRES[id][1];
+  try { history.replaceState(null, '', '#' + id); } catch (e) { }
+  S.view = id; window.scrollTo(0, 0); requestAnimationFrame(drawAll);
+}
+
+/* ---------- state ---------- */
+const S = { tier: 'core', speed: 5, scenario: 'episode', running: false, starting: false, done: false, t: -1, clip: null, night: null, timer: null, sound: true, delay: 15, truth: false, custom: null, view: 'tonight' };
+const hist = { score: [] };
+let logRows = [];
+
+/* ---------- tier ---------- */
+function setTier(t) {
+  S.tier = t; $$('#tierseg button').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
+  $$('#plans .opt').forEach((p) => p.classList.toggle('on', p.dataset.t === t));
+  $$('#stages .stg').forEach((s) => s.classList.toggle('locked', t === 'free'));
+  $('#proRow').style.display = 'none';
+  $('#roomNote').innerHTML = t === 'pro' ? 'Pro: lights ramp at Stage 2 and 3, partner alerted at Stage 3.' : 'Smart lights and partner alerts are on <b>Pro</b>.';
+  $('#labPlanNote').innerHTML = 'Running on <b>' + { free: 'Free', core: 'Core', pro: 'Pro' }[t] + '</b>. Change it in the sidebar.';
+  buildMatrix(); toast({ free: 'Free plan: detection is logged, no live intervention', core: 'Core plan: real-time detection and haptics', pro: 'Pro plan: lights, partner alert and clinician export' }[t]);
+}
+
+/* ---------- haptics + sound ---------- */
+let actx = null;
+function ensureAudio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } } if (actx && actx.state === 'suspended') actx.resume(); }
+function buzz(pattern, freq) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { }
+  if (!S.sound || !actx) return; let at = actx.currentTime;
+  pattern.forEach((ms, i) => { if (i % 2 === 0) { const o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter(); o.type = 'triangle'; o.frequency.value = freq; f.type = 'lowpass'; f.frequency.value = 900; g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.13, at + 0.012); g.gain.setValueAtTime(0.13, at + ms / 1000 - 0.02); g.gain.linearRampToValueAtTime(0, at + ms / 1000); o.connect(f); f.connect(g); g.connect(actx.destination); o.start(at); o.stop(at + ms / 1000 + 0.02); } at += ms / 1000; });
+}
+const PATTERNS = { 1: [[60, 90, 60], 170], 2: [[160, 90, 160, 90, 160], 150], 3: [[420, 110, 420, 110, 420], 120] };
+
+/* ---------- the intervention engine (shared by Tonight and Night lab) ---------- */
+const SC = [['episode', 'Sleep-paralysis episode'], ['normal', 'Normal night'], ['rem', 'REM dreaming'], ['nightmare', 'Nightmare'], ['turnover', 'Turn over'], ['quietwake', 'Quiet wake-up']];
+const SCNAME = { episode: 'a sleep-paralysis episode', normal: 'a normal night', rem: 'vivid REM dreaming', nightmare: 'a nightmare', turnover: 'turning over in bed', quietwake: 'a quiet wake-up' };
+const SCLABEL = Object.fromEntries(SC);
+const STAGE_NAMES = { 1: 'Stage 1: soft double tap', 2: 'Stage 2: firm pulses', 3: 'Stage 3: strong pulses' };
+function Night(clip, tier, delay) {
+  this.clip = clip; this.tier = tier; this.delay = delay; this.det = new E.Detector(MODEL, { threshold: CFG.thr, persist: CFG.persist, lockout: LOCK });
+  this.alarmT = -1; this.firstAlarm = -1; this.stage = 0; this.woke = false; this.wokeT = -1; this.t = -1; this.score = []; this.events = []; this.maxStage = 0;
+}
+Night.prototype.step = function () {
+  const t = ++this.t, c = this.clip, o = this.det.push(c.hr[t], c.resp[t], c.mv[t]), ev = [], self = this;
+  this.score[t] = t < 45 ? null : o.score;
+  const add = (kind, msg, stage) => { const e = { t, kind, msg, stage }; ev.push(e); self.events.push(e); };
+  const fire = (stage) => {
+    self.stage = Math.max(self.stage, stage); self.maxStage = Math.max(self.maxStage, stage); add('stage', STAGE_NAMES[stage], stage);
+    if (self.tier === 'pro') { if (stage === 2) add('light', 'Bedside light up to 30% (warm)'); if (stage === 3) { add('light', 'Light to 100%'); add('partner', 'Partner alert sent'); } }
+  };
+  if (o.alarm) {
+    this.alarmT = t; if (this.firstAlarm < 0) this.firstAlarm = t; this.woke = false; this.stage = 0;
+    if (this.tier === 'free') add('info', 'Pattern detected. Logged for the morning report (live wake-up needs Core)');
+    else { add('alarm', 'Possible sleep-paralysis onset detected (score ' + o.score.toFixed(2) + ')'); fire(1); }
+  }
+  if (this.alarmT >= 0 && !this.woke && this.tier !== 'free') {
+    const dt = t - this.alarmT;
+    if (dt >= 6 && this.stage < 2) fire(2);
+    if (dt >= 12 && this.stage < 3) fire(3);
+    if (dt >= this.delay) { this.woke = true; this.wokeT = t; add('ok', 'Wake-up confirmed (assumed ' + this.delay + ' s after first buzz)'); }
+  }
+  if (this.alarmT >= 0 && this.tier === 'free' && !this.woke && t - this.alarmT >= 3) { this.woke = true; this.wokeT = t; }
+  this.o = o; return { o, events: ev };
+};
+Night.prototype.state = function () {
+  const t = this.t, o = this.o;
+  if (t < 45) return ['cal', 'Calibrating']; if (this.alarmT >= 0 && !this.woke) return ['trig', 'Triggered'];
+  if (this.woke && t - this.wokeT < 25) return ['awake', this.tier === 'free' ? 'Logged' : 'Awake']; if (o && o.score >= 0.5) return ['watch', 'Watching']; return ['base', 'Baseline'];
+};
+function verdictOf(c, n) {
+  const ep = c.type === 'episode', f = n.firstAlarm, det = f >= 0, tier = n.tier, delay = n.delay; let label, cls, desc;
+  if (ep) { if (!det) { label = 'Missed'; cls = 'bad'; desc = 'Episode went undetected'; } else if (f < c.t0) { label = 'Early alarm'; cls = 'bad'; desc = 'Fired ' + (c.t0 - f) + ' s before onset'; } else { label = 'Caught it'; cls = 'good'; desc = 'Alarm ' + (f - c.t0) + ' s after onset'; } }
+  else if (det) { label = 'False alarm'; cls = 'bad'; desc = 'Fired during ' + SCNAME[c.type]; } else { label = 'Stayed quiet'; cls = 'good'; desc = 'Correctly ignored ' + SCNAME[c.type]; }
+  let frozen, frozenD, frozenCls = '';
+  if (ep) { const dur = c.tEnd - c.t0;
+    if (det && tier !== 'free' && f >= c.t0) { const w = Math.min(dur, (f - c.t0) + delay), cut = Math.round((1 - w / dur) * 100); frozen = dur + ' s → ' + w + ' s'; frozenD = cut > 0 ? cut + '% shorter with Lucen (assumes ' + delay + ' s wake-up delay)' : 'Episode ended on its own first'; frozenCls = 'hi'; }
+    else { frozen = dur + ' s'; frozenD = tier === 'free' ? 'No live intervention on Free' : 'No intervention fired'; frozenCls = 'bad'; } }
+  else { frozen = '0 s'; frozenD = 'No episode occurred this night'; frozenCls = 'good'; }
+  const stg = n.maxStage;
+  const inter = stg ? 'Stage ' + stg + (tier === 'pro' && stg >= 2 ? ' + lights' : '') : 'None';
+  const interD = tier === 'pro' && stg >= 3 ? 'Partner alerted at Stage 3' : (tier === 'free' ? 'Free plan logs only' : (stg ? 'Escalated until awake' : 'Nothing to do'));
+  return { label, cls, desc, frozen, frozenD, frozenCls, inter, interD, ep, det };
+}
+const metric = (k, v, d) => '<div class="m"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (d ? '<div class="d">' + d + '</div>' : '') + '</div>';
+
+/* ---------- Tonight ---------- */
+function buildChips() {
+  const el = $('#scChips'); el.innerHTML = '';
+  const list = SC.concat([['mystery', 'Mystery night']]); if (S.custom) list.push(['custom', 'Lab: ' + S.custom.name]);
+  list.forEach((s) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'tab' + (s[0] === 'mystery' ? ' mystery' : '') + (s[0] === S.scenario ? ' on' : ''); b.dataset.sc = s[0]; b.textContent = s[1]; b.onclick = () => { S.scenario = s[0]; $$('#scChips .tab').forEach((c) => c.classList.toggle('on', c.dataset.sc === s[0])); resetNight(); }; el.appendChild(b); });
+}
+function log(kind, msg, t) { const d = document.createElement('div'); const cl = kind === 'stage' ? 'alarm' : (kind === 'partner' ? 'light' : kind); d.innerHTML = '<span class="t">' + clock(Math.max(0, t)) + '</span><span class="' + cl + '">' + esc(msg) + '</span>'; const l = $('#log'); l.appendChild(d); l.scrollTop = l.scrollHeight; logRows.push([clock(Math.max(0, t)), msg]); }
+const STATECOL = { base: 'ok', watch: 'warn', trig: 'bad', awake: 'cobalt-hi', cal: 'dim' };
+function setState(cls, text) {
+  const col = C(STATECOL[cls]); const r = $('#wring'); r.setAttribute('stroke', col); r.setAttribute('stroke-dasharray', cls === 'cal' ? '3 5' : 'none');
+  $('#stateTxt').textContent = text; $('#stateTxt').style.color = col; $('#stateDot').style.background = col;
+  const dd = $('#devDot'); dd.className = 'dot' + (S.running ? (cls === 'trig' ? ' alert' : ' live') : ''); $('#devTxt').textContent = S.running ? 'Watch streaming · simulated' : 'Watch idle · simulated';
+}
+function resetNight() {
+  clearInterval(S.timer); clearTimeout(S.startH); clearTimeout(S.finH); S.running = false; S.starting = false; S.done = false; S.t = -1; S.clip = null; S.night = null;
+  hist.score = []; logRows = []; loadOn($('#plots'), false); loadOn($('#summaryWrap'), false);
+  $('#log').innerHTML = ''; $('#summary').innerHTML = ''; $('#proRow').style.display = 'none'; $('#partnerNote').style.display = 'none';
+  $('#lampglow').setAttribute('opacity', '0'); $$('#stages .stg').forEach((s) => s.classList.remove('on'));
+  const g = $('#goBtn'); g.disabled = false; g.innerHTML = 'Start night'; $('#whr').textContent = '--'; $('#wrr').textContent = '-- br/min'; $('#wclock').textContent = '03:00:00';
+  setState('cal', 'Ready'); drawTonight();
+}
+function pickClip() {
+  if (S.scenario === 'custom' && S.custom) return S.custom.clip;
+  let ty = S.scenario; if (ty === 'mystery') ty = E.SCENARIOS[Math.floor(Math.random() * E.SCENARIOS.length)];
+  const seed = 900000 + Math.floor(Math.random() * 90000);
+  return E.generate(ty, seed, { onset: 70 + (seed % 40) });
+}
+function startNight() {
+  ensureAudio(); if (S.starting) return;
+  if (S.done) { resetNight(); }
+  if (S.running) { clearInterval(S.timer); S.running = false; $('#goBtn').innerHTML = 'Resume'; setState(S.night ? S.night.state()[0] : 'cal', S.night ? S.night.state()[1] : 'Paused'); return; }
+  if (S.t < 0) {
+    S.starting = true; const g = $('#goBtn'); g.disabled = true; g.innerHTML = '<span class="spin"></span>Pairing watch'; loadOn($('#plots'), true);
+    S.startH = setTimeout(() => {
+      S.clip = pickClip(); S.night = new Night(S.clip, S.tier, S.delay); S.starting = false; loadOn($('#plots'), false); reveal($('#plots'));
+      log('info', 'Night started. Learning your baseline for 45 s.', 0); g.disabled = false; run();
+    }, 750); return;
+  }
+  run();
+}
+function run() { S.running = true; $('#goBtn').innerHTML = 'Pause'; S.timer = setInterval(tick, 1000 / S.speed); setState('cal', 'Calibrating'); }
+function applyEvent(e) {
+  log(e.kind, e.msg, e.t);
+  if (e.kind === 'stage') {
+    const p = PATTERNS[e.stage]; buzz(p[0], p[1]);
+    const w = $('#watchbody'); w.classList.remove('ringbuzz1', 'ringbuzz2', 'ringbuzz3'); void w.getBoundingClientRect(); w.classList.add('ringbuzz' + e.stage);
+    $$('#stages .stg').forEach((s) => { if (+s.dataset.i <= e.stage) s.classList.add('on'); });
+  }
+  if (e.kind === 'light' && /30%/.test(e.msg)) $('#lampglow').setAttribute('opacity', '.45');
+  if (e.kind === 'light' && /100%/.test(e.msg)) $('#lampglow').setAttribute('opacity', '1');
+  if (e.kind === 'partner') $('#partnerNote').style.display = 'block';
+}
+function tick() {
+  S.night.tier = S.tier; const r = S.night.step(), t = S.night.t, c = S.clip, o = r.o; S.t = t; hist.score = S.night.score;
+  $('#whr').textContent = Math.round(c.hr[t]); $('#wrr').textContent = c.resp[t].toFixed(0) + ' br/min'; $('#wclock').textContent = clock(t);
+  r.events.forEach(applyEvent); const st = S.night.state(); setState(st[0], st[1]); drawTonight();
+  if (t >= E.LEN - 1) finishNight();
+}
+function finishNight() {
+  clearInterval(S.timer); S.running = false; S.done = true; $('#goBtn').innerHTML = 'Run again'; setState('base', 'Complete'); drawTonight();
+  const c = S.clip, n = S.night, v = verdictOf(c, n);
+  loadOn($('#summaryWrap'), true);
+  S.finH = setTimeout(() => {
+    $('#summary').innerHTML = metric('Detection', '<span class="' + v.cls + '">' + v.label + '</span>', v.desc) + metric('Time frozen', '<span class="' + v.frozenCls + '">' + v.frozen + '</span>', v.frozenD) + metric('Intervention', v.inter, v.interD) + metric('What really happened', '<span style="font-size:20px">' + SCLABEL[c.type] + '</span>', 'Ground truth from the simulator');
+    loadOn($('#summaryWrap'), false); reveal($('#summaryWrap')); $('#proRow').style.display = S.tier === 'pro' ? 'block' : 'none';
+    try { $('#summaryWrap').scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
+  }, 650);
+}
+function drawTonight() {
+  const t = S.t, c = S.clip, n = S.night, truth = (S.truth || S.done) && c, alarmT = n ? n.firstAlarm : -1;
+  const bands = truth && c.t0 >= 0 ? [{ x0: c.t0, x1: Math.min(299, c.tEnd), color: 'rgba(255,107,114,.12)', label: c.type === 'episode' ? 'Real episode' : 'Real: ' + c.type, text: C('bad') }] : [];
+  const vl = alarmT >= 0 ? [{ x: alarmT, color: C('cobalt-hi'), label: 'Lucen alarm', left: alarmT > 220 }] : [];
+  const base = { xmin: 0, xmax: 299, xticks: [0, 60, 120, 180, 240, 299], fmtX: (v) => v === 299 ? '5:00' : Math.floor(v / 60) + ':00', bands, vlines: vl, padR: 18 };
+  const mk = (arr) => { const r = []; for (let i = 0; i <= t; i++) r.push([i, arr[i]]); return r; };
+  const nb = bands.map((b) => Object.assign({}, b, { label: '' })), nv = vl.map((v) => Object.assign({}, v, { label: '' })), hv = vl.map((v) => Object.assign({}, v, { dy: 16 }));
+  plot($('#c-hr'), Object.assign({}, base, { bands: bands, vlines: hv, ymin: 40, ymax: 110, yticks: [50, 70, 90, 110], layers: [{ data: c ? mk(c.hr) : [], color: C('hr'), width: 1.8 }] }));
+  plot($('#c-rr'), Object.assign({}, base, { bands: nb, vlines: nv, ymin: 5, ymax: 36, yticks: [10, 20, 30], layers: [{ data: c ? mk(c.resp) : [], color: C('resp'), width: 1.8 }] }));
+  plot($('#c-mv'), Object.assign({}, base, { bands: nb, vlines: nv, ymin: 0, ymax: 1, yticks: [0, 0.5, 1], layers: [{ data: c ? mk(c.mv) : [], color: '#aab1c2', width: 1.4 }] }));
+  const sc = []; for (let i = 0; i <= t; i++) sc.push([i, hist.score[i] == null ? null : hist.score[i]]);
+  plot($('#c-sc'), Object.assign({}, base, { bands: nb, vlines: nv, ymin: 0, ymax: 1, yticks: [0, 0.5, 1], hlines: [{ y: CFG.thr, color: C('warn'), label: 'threshold ' + CFG.thr.toFixed(2) }], layers: [{ data: sc, color: C('cobalt-hi'), width: 2, fill: 'rgba(47,91,255,.16)' }] }));
+  $('#lv-hr').textContent = c && t >= 0 ? Math.round(c.hr[t]) + ' bpm' : ''; $('#lv-rr').textContent = c && t >= 0 ? c.resp[t].toFixed(0) + ' /min' : '';
+  $('#lv-mv').textContent = c && t >= 0 ? c.mv[t].toFixed(2) : ''; $('#lv-sc').textContent = t >= 45 && hist.score[t] != null ? hist.score[t].toFixed(2) : '';
+}
+
+/* ---------- forms: validation ---------- */
+function check(inp) {
+  const v = inp.value.trim(), d = inp.dataset;
+  if (inp.validity && inp.validity.badInput) return 'Enter a number.';
+  if (!v) return d.req ? d.label + ' is required.' : '';
+  if (d.kind === 'name') return /^[A-Za-z0-9][A-Za-z0-9 .'\-]{1,23}$/.test(v) ? '' : 'Use 2 to 24 letters, numbers or spaces.';
+  if (inp.tagName === 'SELECT') return '';
+  const n = Number(v); if (!isFinite(n)) return 'Enter a number.';
+  if (d.int && !Number.isInteger(n)) return 'Use a whole number.';
+  if (d.min !== undefined && n < +d.min) return d.label + ' must be at least ' + d.min + '.';
+  if (d.max !== undefined && n > +d.max) return d.label + ' must be at most ' + d.max + '.';
+  return '';
+}
+function setErr(inp, msg) { const f = inp.closest('.fld'); f.classList.toggle('invalid', !!msg); f.querySelector('.err').textContent = msg; inp.setAttribute('aria-invalid', msg ? 'true' : 'false'); }
+function validate(form) {
+  let ok = true, first = null;
+  $$('[data-label]', form).forEach((inp) => { const m = check(inp); setErr(inp, m); inp.dataset.t = '1'; if (m) { ok = false; if (!first) first = inp; const f = inp.closest('.fld'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); } });
+  if (first) { first.focus(); toast('Check the highlighted field' + ($$('.fld.invalid', form).length > 1 ? 's' : '')); }
+  return ok;
+}
+function liveValidate(form) {
+  $$('[data-label]', form).forEach((inp) => {
+    inp.addEventListener('input', () => { if (inp.dataset.t || inp.closest('.fld').classList.contains('invalid')) setErr(inp, check(inp)); });
+    inp.addEventListener('blur', () => { inp.dataset.t = '1'; setErr(inp, check(inp)); });
+  });
+  form.addEventListener('submit', (e) => e.preventDefault());
+}
+const val = (id) => Number($('#' + id).value);
+
+/* ---------- Night lab ---------- */
+const RUNS = []; let curRun = null;
+const LABP = { ep: ['Mira R.', 58, 14, 'episode', 120], nm: ['Dev K.', 64, 15, 'nightmare', 110], to: ['Anika S.', 61, 13.5, 'turnover', 100], nl: ['Sam T.', 55, 13, 'normal', 120] };
+function buildLab() {
+  $('#f-sc').innerHTML = SC.map((s) => '<option value="' + s[0] + '">' + s[1] + '</option>').join('');
+  liveValidate($('#labForm'));
+  $$('#labPresets .tab').forEach((b) => b.onclick = () => {
+    const p = LABP[b.dataset.p]; $('#f-name').value = p[0]; $('#f-hr').value = p[1]; $('#f-rr').value = p[2]; $('#f-sc').value = p[3]; $('#f-on').value = p[4]; $('#f-seed').value = '';
+    $$('#labPresets .tab').forEach((x) => x.classList.toggle('on', x === b)); $$('#labForm .fld').forEach((f) => { f.classList.remove('invalid'); f.querySelector('.err').textContent = ''; });
+  });
+  $('#labPresets .tab').classList.add('on');
+  $('#labForm').addEventListener('input', () => $$('#labPresets .tab').forEach((x) => x.classList.remove('on')));
+  $('#labRun').onclick = labRun; $('#labClear').onclick = () => { RUNS.length = 0; curRun = null; $('#labOut').innerHTML = '<div class="empty">Nothing yet. Fill in the form and press <b>Run analysis</b>.</div>'; renderHist(); toast('History cleared'); };
+  $('#labCsv').onclick = () => { if (!RUNS.length) { toast('Run an analysis first'); return; } if (S.tier !== 'pro') { toast('Clinician export is a Pro feature. Switch plan in the sidebar.'); return; } downloadCsv('lucen_session_history.csv', 'run,sleeper,night,plan,result,alarm_second,peak_score,seed\n' + RUNS.map((r) => [r.id, '"' + r.name + '"', r.type, r.tier, r.v.label, r.n.firstAlarm, r.peak.toFixed(3), r.seed].join(',')).join('\n')); };
+  renderHist();
+}
+function labRun() {
+  const form = $('#labForm'); if (!validate(form)) return;
+  const type = $('#f-sc').value, seedRaw = $('#f-seed').value.trim();
+  const vals = { name: $('#f-name').value.trim(), hr: val('f-hr'), rr: val('f-rr'), type, onset: val('f-on'), seed: seedRaw ? Number(seedRaw) : 100000 + Math.floor(Math.random() * 800000) };
+  withLoading({ btn: $('#labRun'), label: 'Analysing', els: [$('#labOut')], ms: 950, work: () => {
+    const clip = E.generate(type, vals.seed, { onset: vals.onset, hrBase: vals.hr, respBase: vals.rr }), n = new Night(clip, S.tier, S.delay);
+    for (let t = 0; t < E.LEN; t++) n.step(); const peak = Math.max.apply(null, n.score.filter((x) => x != null));
+    const run = Object.assign({ id: RUNS.length + 1, tier: S.tier, clip, n, v: verdictOf(clip, n), peak }, vals); RUNS.push(run); curRun = run; renderRun(run); renderHist();
+  } });
+}
+function renderRun(r) {
+  const c = r.clip, n = r.n, v = r.v, f = n.firstAlarm;
+  const alarmTxt = f < 0 ? 'None' : (v.ep && f >= c.t0 ? (f - c.t0) + ' s <small>after onset</small>' : clock(f));
+  const ev = n.events.length ? n.events.map((e) => '<div><span class="t">' + clock(e.t) + '</span><span class="' + (e.kind === 'stage' || e.kind === 'alarm' ? 'alarm' : (e.kind === 'light' || e.kind === 'partner' ? 'light' : (e.kind === 'ok' ? 'ok' : ''))) + '">' + esc(e.msg) + '</span></div>').join('') : '<div><span class="t">--</span><span>Nothing fired all night</span></div>';
+  $('#labOut').innerHTML =
+    '<div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:24px"><div><h3 style="font-size:21px;letter-spacing:-.01em">' + esc(r.name) + '</h3><div class="note" style="margin:4px 0 0">' + SCLABEL[r.type] + ' · resting ' + r.hr + ' bpm, ' + r.rr + '/min · seed ' + r.seed + '</div></div><span class="verdict ' + (v.cls === 'good' ? '' : 'bad') + '">' + v.label + '</span></div>' +
+    '<div class="metrics" style="grid-template-columns:1fr 1fr">' + metric('Alarm', alarmTxt, v.desc) + metric('Peak score', r.peak.toFixed(2), 'Threshold ' + CFG.thr.toFixed(2) + ' held ' + CFG.persist + ' s') + metric('Time frozen', '<span class="' + v.frozenCls + '">' + v.frozen + '</span>', v.frozenD) + metric('Intervention', v.inter, v.interD) + '</div>' +
+    '<div style="margin-top:30px"><div class="pl"><span>Heart rate</span><b style="color:var(--hr)">' + r.hr + ' bpm resting</b></div><canvas class="ch" id="lc-hr" style="height:96px"></canvas>' +
+    '<div class="pl" style="margin-top:10px"><span>Onset score</span><b style="color:var(--cobalt-hi)">peak ' + r.peak.toFixed(2) + '</b></div><canvas class="ch" id="lc-sc" style="height:110px"></canvas></div>' +
+    '<h2 style="margin:28px 0 8px">Timeline</h2><div class="tl">' + ev + '</div>' +
+    '<div class="formfoot" style="margin-top:22px"><button class="btn sm" id="labReplay" type="button">Replay in Tonight</button><button class="btn sm" id="labOne" type="button">Export CSV</button></div>';
+  $('#labReplay').onclick = () => { S.custom = { clip: r.clip, name: r.name }; S.scenario = 'custom'; buildChips(); showTab('tonight'); resetNight(); toast('Loaded into Tonight. Press Start night.'); };
+  $('#labOne').onclick = () => { if (S.tier !== 'pro') { toast('Clinician export is a Pro feature. Switch plan in the sidebar.'); return; } downloadCsv('lucen_' + r.name.replace(/\W+/g, '_') + '.csv', clipCsv(r)); };
+  drawRun(r);
+}
+function drawRun(r) {
+  const c = r.clip, n = r.n, bands = c.t0 >= 0 ? [{ x0: c.t0, x1: Math.min(299, c.tEnd), color: 'rgba(255,107,114,.12)', label: r.type === 'episode' ? 'Real episode' : 'Real: ' + r.type, text: C('bad') }] : [], vl = n.firstAlarm >= 0 ? [{ x: n.firstAlarm, color: C('cobalt-hi'), label: 'alarm', left: n.firstAlarm > 220 }] : [];
+  const base = { xmin: 0, xmax: 299, xticks: [0, 60, 120, 180, 240, 299], fmtX: (v) => v === 299 ? '5:00' : Math.floor(v / 60) + ':00', bands, vlines: vl, padR: 18 };
+  plot($('#lc-hr'), Object.assign({}, base, { vlines: vl.map((v) => Object.assign({}, v, { label: '' })), ymin: 40, ymax: 115, yticks: [50, 80, 110], layers: [{ data: c.hr.map((v, i) => [i, v]), color: C('hr'), width: 1.6 }] }));
+  plot($('#lc-sc'), Object.assign({}, base, { bands: bands.map((b) => Object.assign({}, b, { label: '' })), ymin: 0, ymax: 1, yticks: [0, 0.5, 1], hlines: [{ y: CFG.thr, color: C('warn'), label: CFG.thr.toFixed(2) }], layers: [{ data: n.score.map((v, i) => [i, v]), color: C('cobalt-hi'), width: 2, fill: 'rgba(47,91,255,.16)' }] }));
+}
+function renderHist() {
+  const t = $('#labHist');
+  if (!RUNS.length) { t.innerHTML = '<tbody><tr><td class="empty" style="padding-left:14px">Each analysis you run is kept here for the session.</td></tr></tbody>'; return; }
+  t.innerHTML = '<thead><tr><th>#</th><th>Sleeper</th><th>Night</th><th>Plan</th><th>Result</th><th class="r">Alarm</th><th class="r">Peak score</th></tr></thead><tbody>' + RUNS.slice().reverse().map((r) => '<tr class="click' + (r === curRun ? ' pick' : '') + '" data-id="' + r.id + '"><td class="mutedtd">' + r.id + '</td><td><b>' + esc(r.name) + '</b></td><td class="mutedtd">' + SCLABEL[r.type] + '</td><td class="mutedtd">' + r.tier + '</td><td class="' + (r.v.cls === 'good' ? 'good' : 'bad') + '">' + r.v.label + '</td><td class="r">' + (r.n.firstAlarm < 0 ? '–' : clock(r.n.firstAlarm)) + '</td><td class="r">' + r.peak.toFixed(2) + '</td></tr>').join('') + '</tbody>';
+  $$('#labHist tr.click').forEach((tr) => tr.onclick = () => { const r = RUNS.find((x) => x.id === +tr.dataset.id); curRun = r; withLoading({ els: [$('#labOut')], ms: 350, work: () => { renderRun(r); renderHist(); } }); });
+}
+function clipCsv(r) {
+  const c = r.clip, n = r.n; let s = 'Lucen clinician report (simulated night)\nSleeper,' + r.name + '\nScenario,' + r.type + '\nPlan,' + r.tier + '\nAlarm second,' + n.firstAlarm + '\nWake-up delay assumed,' + n.delay + '\n\nEvents\nclock,event\n' + n.events.map((e) => clock(e.t) + ',' + e.msg.replace(/,/g, ';')).join('\n') + '\n\nsecond,hr,resp,movement,score\n';
+  for (let i = 0; i < E.LEN; i++) s += i + ',' + c.hr[i] + ',' + c.resp[i] + ',' + c.mv[i] + ',' + (n.score[i] == null ? '' : n.score[i].toFixed(3)) + '\n'; return s;
+}
+function downloadCsv(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); toast('Downloaded ' + name); }
+
+/* ---------- Detector ---------- */
+const FEATNAMES = { dHR: 'Heart rate above own baseline', slopeHR: 'Heart rate rising fast', dResp: 'Breathing above own baseline', respCV: 'Breathing irregularity', moveMean: 'Average movement', moveMax: 'Peak movement', still: 'Share of time completely still' };
+function buildWeights() {
+  const w = MODEL.w, mx = Math.max.apply(null, w.map(Math.abs));
+  $('#weights').innerHTML = MODEL.feats.map((f, i) => { const v = w[i] / mx * 50, pos = v >= 0; return '<div class="wbar"><div>' + FEATNAMES[f] + '</div><div class="track"><div class="fill" style="' + (pos ? 'left:50%;width:' + v + '%;background:' + C('cobalt-hi') : 'right:50%;width:' + (-v) + '%;background:' + C('dim')) + '"></div></div></div>'; }).join('');
+}
+function renderEval(ev) {
+  const names = { episode: 'Sleep-paralysis episode', normal: 'Normal night', rem: 'REM dreaming', nightmare: 'Nightmare', turnover: 'Turn over', quietwake: 'Quiet wake-up' };
+  let h = '<thead><tr><th>Scenario</th><th class="c">Goal</th><th class="c">Result</th><th class="c">Median delay</th></tr></thead><tbody>';
+  Object.keys(names).forEach((k) => { const e = ev[k]; if (!e) return; const isEp = k === 'episode'; const v = isEp ? Math.round(e.hitRate * 100) + '% caught' : (e.faRate === 0 ? '0% false alarms' : (e.faRate * 100).toFixed(1) + '% false alarms'); const bad = isEp ? e.hitRate < 0.9 : e.faRate > 0.02; h += '<tr><td>' + names[k] + '</td><td class="c mutedtd">' + (isEp ? 'detect' : 'stay quiet') + '</td><td class="c ' + (bad ? 'bad' : 'good') + '">' + v + '</td><td class="c">' + (isEp && e.medLatency != null ? e.medLatency + ' s' : '–') + '</td></tr>'; });
+  $('#evalTable').innerHTML = h + '</tbody>';
+}
+const TUNES = [];
+function evalRun() {
+  const thr = +$('#thr').value, per = +$('#per').value;
+  withLoading({ btn: $('#evalBtn'), label: 'Simulating', els: [$('#evalWrap')], ms: 500, work: () => {
+    const t0 = performance.now(), ev = E.evaluate(MODEL, 2000000 + Math.floor(Math.random() * 900000), 60, { threshold: thr, persist: per, lockout: LOCK });
+    renderEval(ev); const ms = Math.round(performance.now() - t0), worst = Object.keys(ev).filter((k) => k !== 'episode').reduce((a, k) => ev[k].faRate > a[1] ? [k, ev[k].faRate] : a, ['none', 0]);
+    $('#evalNote').textContent = '360 fresh simulated nights, scored in ' + ms + ' ms on this device';
+    TUNES.unshift('<div style="padding:5px 0"><b>' + thr.toFixed(2) + '</b> held <b>' + per + ' s</b> → ' + Math.round(ev.episode.hitRate * 100) + '% caught, worst false-alarm rate ' + (worst[1] * 100).toFixed(1) + '%' + (worst[1] > 0 ? ' (' + SCLABEL[worst[0]].toLowerCase() + ')' : '') + '</div>');
+    $('#evalHist').innerHTML = '<h2 style="margin:22px 0 6px">This session</h2>' + TUNES.slice(0, 5).join('');
+  } });
+}
+
+/* ---------- Market ---------- */
+function buildMarket() {
+  const W = 760, H = 430, L = 74, R = 30, T = 20, B = 54, pw = W - L - R, ph = H - T - B;
+  const ly = (v) => T + ph - (Math.log10(v) - Math.log10(50)) / (Math.log10(12000) - Math.log10(50)) * ph, lx = (v) => L + v * pw;
+  const pts = [{ n: 'Calm', x: 0.1, y: 70, d: 'pre-sleep content' }, { n: 'Oura', x: 0.3, y: 520, d: 'next-morning reports' }, { n: 'NightWare', x: 0.88, y: 7000, d: 'Rx, PTSD nightmares' }, { n: 'Lucen Core', x: 0.9, y: 89, d: '' }, { n: 'Lucen Pro', x: 0.78, y: 149, d: '' }];
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block" role="img" aria-label="Positioning map">';
+  s += '<rect x="' + lx(0.55) + '" y="' + ly(300) + '" width="' + (lx(1) - lx(0.55)) + '" height="' + (T + ph - ly(300)) + '" rx="16" fill="rgba(47,91,255,.14)"/>';
+  s += '<text x="' + (lx(0.55) + 14) + '" y="' + (ly(300) + 24) + '" fill="' + C('cobalt-hi') + '" font-size="12" font-weight="700" letter-spacing="1.4">REAL-TIME AND AFFORDABLE</text>';
+  [100, 1000, 10000].forEach((v) => { s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + ly(v) + '" y2="' + ly(v) + '" stroke="rgba(255,255,255,.06)"/><text x="' + (L - 10) + '" y="' + (ly(v) + 4) + '" text-anchor="end" fill="' + C('dim') + '" font-size="12">$' + v.toLocaleString() + '</text>'; });
+  s += '<text x="' + L + '" y="' + (H - 18) + '" fill="' + C('muted') + '" font-size="13">← Reports after the night</text><text x="' + (W - R) + '" y="' + (H - 18) + '" text-anchor="end" fill="' + C('muted') + '" font-size="13">Acts during the night →</text>';
+  pts.forEach((p) => { const lu = p.n.indexOf('Lucen') === 0, r = lu ? 11 : 8, right = p.x > 0.85, tx = lx(p.x) + (right ? -r - 8 : r + 8), anc = right ? 'end' : 'start';
+    s += '<g class="pt" data-n="' + (lu ? 'Lucen' : p.n) + '" style="transition:all .2s ease"><circle cx="' + lx(p.x) + '" cy="' + ly(p.y) + '" r="' + r + '" fill="' + (lu ? C('cobalt') : '#8a92a6') + '"' + (lu ? ' stroke="#fff" stroke-width="2"' : '') + '/><text x="' + tx + '" y="' + (ly(p.y) + 4) + '" text-anchor="' + anc + '" fill="' + (lu ? '#fff' : C('text')) + '" font-size="14" font-weight="650">' + p.n + '</text>' + (p.d ? '<text x="' + tx + '" y="' + (ly(p.y) + 20) + '" text-anchor="' + anc + '" fill="' + C('dim') + '" font-size="12">' + p.d + '</text>' : '') + '</g>'; });
+  $('#posmap').innerHTML = s + '</svg>';
+  const rows = [['NightWare', 'Prescription digital therapeutic for PTSD nightmares. Vibrates on an Apple Watch when a nightmare is detected.', 'About US$7,000, clinical and VA channels', 1, 0], ['Oura', 'Ring that scores sleep. Passive reports the next morning.', 'US$299 to 499 ring plus about US$6 to 10 a month', 0, 0], ['Calm', 'Pre-sleep meditation and sleep stories.', 'About US$70 a year', 0, 0], ['Lucen', 'Detects onset from the watch biometrics and interrupts it with staged haptics and room lighting.', 'US$89 a year (Core), US$149 (Pro), on a watch you own', 1, 1]];
+  $('#cmpTable').innerHTML = '<thead><tr><th>Product</th><th>What it does</th><th>Cost to user</th><th class="c">Acts during the night</th><th class="c">Built for sleep paralysis</th></tr></thead><tbody>' + rows.map((r) => '<tr data-n="' + r[0] + '"' + (r[0] === 'Lucen' ? ' class="pick"' : '') + '><td><b>' + r[0] + '</b></td><td class="mutedtd">' + r[1] + '</td><td class="mutedtd">' + r[2] + '</td><td class="c">' + (r[3] ? '<span class="tick">Yes</span>' : '<span class="dash">No</span>') + '</td><td class="c">' + (r[4] ? '<span class="tick">Yes</span>' : '<span class="dash">No</span>') + '</td></tr>').join('') + '</tbody>';
+  $$('#cmpTable tbody tr').forEach((tr) => { tr.onmouseenter = () => $$('#posmap .pt').forEach((g) => { g.style.opacity = g.dataset.n === tr.dataset.n ? 1 : .22; }); tr.onmouseleave = () => $$('#posmap .pt').forEach((g) => { g.style.opacity = 1; }); });
+}
+
+/* ---------- Plans ---------- */
+const PLANS = [{ id: 'free', nm: 'Free', pr: '$0', per: 'forever', alt: 'Builds the dataset and the habit' }, { id: 'core', nm: 'Core', pr: '$9.99', per: '/month', alt: '$89 a year, about ₹' + Math.round(89 * 95).toLocaleString('en-IN'), pill: 'THE PROMISE' }, { id: 'pro', nm: 'Pro', pr: '$16.99', per: '/month', alt: '$149 a year, about ₹' + Math.round(149 * 95).toLocaleString('en-IN') }];
+const FEATS = [['Sleep and heart-rate tracking, morning report', 1, 1, 1], ['Episode logging after the fact', 1, 1, 1], ['Real-time onset detection', 0, 1, 1], ['Staged haptic wake-up, 3 stages', 0, 1, 1], ['Smart-home lighting ramp', 0, 0, 1], ['Partner alert', 0, 0, 1], ['Clinician-ready export', 0, 0, 1]];
+function buildPlans() {
+  $('#plans').innerHTML = PLANS.map((p) => '<button type="button" class="opt" data-t="' + p.id + '">' + (p.pill ? '<span class="pill">' + p.pill + '</span>' : '') + '<span class="nm">' + p.nm + '</span><span class="pr">' + p.pr + ' <small>' + p.per + '</small></span><span class="alt">' + p.alt + '</span></button>').join('');
+  $$('#plans .opt').forEach((el) => el.onclick = () => setTier(el.dataset.t));
+}
+function buildMatrix() {
+  const ix = { free: 1, core: 2, pro: 3 }[S.tier];
+  $('#matrix').innerHTML = '<thead><tr><th>Feature</th><th class="c">Free</th><th class="c">Core</th><th class="c">Pro</th></tr></thead><tbody>' + FEATS.map((f) => '<tr><td>' + f[0] + '</td>' + [1, 2, 3].map((i) => '<td class="c" style="' + (i === ix ? 'background:var(--cobalt-lo)' : '') + '">' + (f[i] ? '<span class="tick">✓</span>' : '<span class="dash">–</span>') + '</td>').join('') + '</tr>').join('') + '</tbody>';
+}
+const MIX = { shAnnual: 0.65, shPro: 0.20, realize: 0.89 };
+function buildMix() {
+  const def = [['shAnnual', 'Share on annual plans', 0, 1, 0.05, (v) => Math.round(v * 100) + '%'], ['shPro', 'Share on Pro', 0, 0.6, 0.05, (v) => Math.round(v * 100) + '%'], ['realize', 'Revenue kept after offers and refunds', 0.7, 1, 0.01, (v) => Math.round(v * 100) + '%']];
+  $('#mixSliders').innerHTML = def.map((d) => '<div class="rng"><label>' + d[1] + ' <b id="mv-' + d[0] + '"></b></label><input type="range" id="mx-' + d[0] + '" min="' + d[2] + '" max="' + d[3] + '" step="' + d[4] + '" value="' + MIX[d[0]] + '"></div>').join('');
+  const upd = () => { def.forEach((d) => { $('#mv-' + d[0]).textContent = d[5](MIX[d[0]]); }); const u = F.unit(Object.assign({}, F.BASE, MIX));
+    const rows = [['Revenue per paying user / month', inrFull(u.arpu)], ['Store fee + payment handling', '-' + inrFull(u.fees)], ['Cloud serving, incl. free users', '-' + inrFull(u.serve)], ['<b>Gross profit / month</b>', '<b class="good">' + inrFull(u.gp) + ' (' + Math.round(u.gm * 100) + '%)</b>'], ['Expected lifetime', u.life.toFixed(1) + ' months'], ['Cost to win a paying user', inrFull(u.cac)], ['Lifetime gross profit', inrFull(u.ltv)], ['<b>Return on acquisition</b>', '<b class="hi">' + u.ltvCac.toFixed(1) + 'x</b>'], ['Payback', u.payback.toFixed(1) + ' months']];
+    $('#unitTable').innerHTML = '<tbody>' + rows.map((r) => '<tr><td>' + r[0] + '</td><td class="r">' + r[1] + '</td></tr>').join('') + '</tbody>'; };
+  def.forEach((d) => { $('#mx-' + d[0]).oninput = (e) => { MIX[d[0]] = +e.target.value; upd(); }; }); upd();
+}
+function revRun() {
+  const form = $('#revForm'); if (!validate(form)) return;
+  const n = val('r-users'), a = val('r-ann') / 100, p = val('r-pro') / 100;
+  withLoading({ btn: $('#revRun'), label: 'Calculating', els: [$('#revOut')], ms: 650, work: () => {
+    const u = F.unit(Object.assign({}, F.BASE, MIX, { shAnnual: a, shPro: p })), rev = n * u.arpu, gp = n * u.gp, pro = n * p, core = n - pro;
+    $('#revMetrics').innerHTML = metric('Monthly revenue', inr(rev), inrFull(u.arpu) + ' per paying user') + metric('Gross profit', inr(gp), Math.round(u.gm * 100) + '% margin after fees and serving') + metric('Annualised gross profit', inr(gp * 12), 'if the base held steady') +
+      metric('Plan mix', Math.round(core).toLocaleString('en-IN') + ' <small>Core</small> · ' + Math.round(pro).toLocaleString('en-IN') + ' <small>Pro</small>', Math.round(a * 100) + '% of them billed annually');
+  } });
+}
+
+/* ---------- Finance + Growth ---------- */
+const BIZ = { conv: 0.025, cpi: 50, mktCap: 300000, shPro: 0.20 };
+const BDEF = [['conv', 'Install to paid conversion', 0.005, 0.05, 0.001, (v) => (v * 100).toFixed(1) + '%'], ['cpi', 'Cost per install', 30, 120, 5, (v) => '₹' + v], ['mktCap', 'Marketing cap per month', 100000, 500000, 25000, (v) => inr(v)], ['shPro', 'Share of customers on Pro', 0, 0.5, 0.05, (v) => Math.round(v * 100) + '%']];
+const PRESETS = { base: { conv: 0.025, cpi: 50, mktCap: 300000, shPro: 0.20 }, stress: { conv: 0.015, cpi: 80, mktCap: 300000, shPro: 0.20 }, up: { conv: 0.035, cpi: 40, mktCap: 300000, shPro: 0.20 } };
+let BR = null;
+function buildBiz() {
+  $('#bizSliders').innerHTML = BDEF.map((d) => '<div class="rng"><label>' + d[1] + ' <b id="bv-' + d[0] + '"></b></label><input type="range" id="bx-' + d[0] + '" min="' + d[2] + '" max="' + d[3] + '" step="' + d[4] + '"></div>').join('');
+  BDEF.forEach((d) => { $('#bx-' + d[0]).oninput = () => { BIZ[d[0]] = +$('#bx-' + d[0]).value; $$('#presets button').forEach((c) => c.classList.remove('on')); updBiz(); }; });
+  $$('#presets button').forEach((c) => c.onclick = () => { if (c.classList.contains('on')) return; $$('#presets button').forEach((x) => x.classList.toggle('on', x === c)); withLoading({ els: [$('#kpiWrap'), $('#chartWrap')], ms: 520, work: () => { Object.assign(BIZ, PRESETS[c.dataset.p]); updBiz(); } }); });
+  updBiz();
+}
+function updBiz() {
+  BDEF.forEach((d) => { $('#bx-' + d[0]).value = BIZ[d[0]]; $('#bv-' + d[0]).textContent = d[5](BIZ[d[0]]); });
+  BR = F.run(BIZ); const b0 = F.run(), same = BDEF.every((d) => Math.abs(BIZ[d[0]] - F.BASE[d[0]]) < 1e-9), tie = $('#tie');
+  tie.className = 'tie ' + (same ? 'ok' : 'no'); tie.textContent = same ? '✓ Matches the Assignment IV workbook' : 'Sensitivity case · base ask ' + inr(b0.ask) + ', break-even month ' + b0.breakEven;
+  $('#kpis').innerHTML = metric('Funding ask', inr(BR.ask), 'peak need ' + inr(BR.peak) + ' plus 15% buffer') + metric('Cash low point', 'Month ' + BR.lowMonth, inr(-BR.peak) + ' cumulative') + metric('Operating break-even', BR.breakEven ? 'Month ' + BR.breakEven : '<span class="bad">Not in 4 yrs</span>', 'first month with profit') + metric('Paying users, month 48', Math.round(BR.endUsers).toLocaleString('en-IN'), inr(BR.endRev) + ' revenue a month') + metric('Gross profit per user', inrFull(BR.u.gp), BR.u.ltvCac.toFixed(1) + 'x return on ' + inrFull(BR.u.cac));
+  $('#bizNote').innerHTML = BR.breakEven ? 'Cash keeps falling until month ' + BR.lowMonth + ' because growth spend and the team come before revenue. ' + (BR.cumPositive ? 'Cumulative cash turns positive in month ' + BR.cumPositive + '.' : 'Cumulative cash does not recover inside 48 months, so the round has to be sized to survive the low point, not the end state.') : 'In this case monthly operations never turn profitable inside 48 months. This is why conversion and acquisition cost are our two riskiest assumptions.';
+  drawBiz(); drawGtm();
+}
+function drawBiz() {
+  if (!BR) return; const r = BR.rows, xt = [1, 12, 24, 36, 48], fx = (v) => 'M' + v, lakh = (v) => (v / 1e5).toFixed(0);
+  const cash = r.map((x) => [x.m, x.cum]), mn = Math.min.apply(null, cash.map((p) => p[1])), mx = Math.max.apply(null, cash.map((p) => p[1]), 0);
+  const lo = Math.floor(Math.min(mn, -BR.ask) / 2e6) * 2e6, hi = Math.max(2e6, Math.ceil(mx / 2e6) * 2e6);
+  plot($('#c-cash'), { xmin: 1, xmax: 48, ymin: lo, ymax: hi, yticks: [lo, lo / 2, 0], fmtY: lakh, xticks: xt, fmtX: fx, zero: 0, padL: 44, layers: [{ data: cash, color: C('cobalt-hi'), width: 2.6, fill: 'rgba(47,91,255,.16)' }], hlines: [{ y: -BR.ask, color: C('warn'), label: 'ask ' + inr(BR.ask) }], dots: [{ x: BR.lowMonth, y: -BR.peak, color: C('bad'), label: 'low ' + inr(-BR.peak), dy: -18, left: BR.lowMonth > 30 }] });
+  const op = r.map((x) => [x.m, x.op]), omn = Math.min.apply(null, op.map((p) => p[1])), omx = Math.max.apply(null, op.map((p) => p[1]), 0), olo = Math.floor(omn / 2e5) * 2e5, ohi = Math.max(2e5, Math.ceil(omx / 2e5) * 2e5);
+  plot($('#c-op'), { xmin: 1, xmax: 48, ymin: olo, ymax: ohi, yticks: [olo, 0, ohi], fmtY: lakh, xticks: xt, fmtX: fx, zero: 0, padL: 44, layers: [{ type: 'bar', data: op, colorFn: (v) => v >= 0 ? C('ok') : 'rgba(255,107,114,.78)' }], vlines: BR.breakEven ? [{ x: BR.breakEven, color: C('warn'), label: 'break-even M' + BR.breakEven, left: true }] : [] });
+}
+function drawGtm() {
+  if (!BR) return; const m = +$('#gtmMonth').value; $('#gtmMonthV').textContent = m;
+  const r = BR.rows, row = r[m - 1];
+  plot($('#c-gtm'), { xmin: 4, xmax: 48, ymin: 0, ymax: 320000, yticks: [0, 100000, 200000, 300000], fmtY: (v) => (v / 1000) + 'k', xticks: [4, 12, 24, 36, 48], fmtX: (v) => 'M' + v, padL: 40, layers: [{ type: 'bar', data: r.filter((x) => x.m >= 4).map((x) => [x.m, x.mkt]), color: 'rgba(115,145,255,.55)' }], vlines: [{ x: m, color: '#fff', label: 'month ' + m }] });
+  const bars = [['Marketing spend', inr(row.mkt), 100, '#2441b8'], ['Installs', Math.round(row.inst).toLocaleString('en-IN'), 82, '#2f5bff'], ['New paying users', row.nw.toFixed(0), 56, '#3f6bff'], ['All paying users', Math.round(row.stock).toLocaleString('en-IN'), 38 + Math.min(40, row.stock / 40), '#4f78ff']];
+  $('#funnel').innerHTML = bars.map((b) => '<div class="frow"><div>' + b[0] + '</div><div class="bar" style="width:' + b[2] + '%;background:' + b[3] + '">' + b[1] + '</div></div>').join('');
+  $('#funnelNote').innerHTML = 'Each paying user costs <b>' + inrFull(BR.u.cac) + '</b> to win (₹' + BIZ.cpi + ' per install, ' + (BIZ.conv * 100).toFixed(1) + '% convert) and returns about <b>' + BR.u.ltvCac.toFixed(1) + 'x</b> that in lifetime gross profit. Bar lengths are illustrative, labels are exact.';
+}
+function gtmRun() {
+  const form = $('#gtmForm'); if (!validate(form)) return;
+  const B = val('g-bud'), cpi = val('g-cpi'), cv = val('g-conv') / 100;
+  withLoading({ btn: $('#gtmRun'), label: 'Running', els: [$('#gtmOut')], ms: 700, work: () => {
+    const u = F.unit(Object.assign({}, F.BASE, { shPro: BIZ.shPro })), inst = B / cpi, paid = inst * cv, cac = cpi / cv, ratio = u.ltv / cac, pay = cac / u.gp, maxCac = u.ltv / 3;
+    const verdict = ratio >= 3 ? '<span class="good">Healthy</span>' : (ratio >= 1 ? '<span class="warn">Thin</span>' : '<span class="bad">Losing money</span>');
+    $('#gtmMetrics').innerHTML = metric('Installs a month', Math.round(inst).toLocaleString('en-IN'), inr(B) + ' at ₹' + cpi + ' each') + metric('New paying users', paid < 10 ? paid.toFixed(1) : Math.round(paid).toLocaleString('en-IN'), 'at ' + (cv * 100).toFixed(1) + '% install to paid') + metric('Cost per paying user', inrFull(cac), 'plan assumes ' + inrFull(F.unit(F.BASE).cac)) +
+      metric('Payback', pay.toFixed(1) + ' <small>months</small>', 'on ' + inrFull(u.gp) + ' gross profit a month') + metric('Return on acquisition', ratio.toFixed(1) + 'x ' + '<small>' + verdict + '</small>', 'Highest cost per paying user that still returns 3x: ' + inrFull(maxCac));
+  } });
+}
+
+/* ---------- wire up ---------- */
+function drawAll() { if (S.view === 'tonight') drawTonight(); if (S.view === 'lab' && curRun) drawRun(curRun); if (S.view === 'finance') drawBiz(); if (S.view === 'growth') drawGtm(); }
+$('#tierseg').onclick = (e) => { const b = e.target.closest('button'); if (b && b.dataset.t !== S.tier) setTier(b.dataset.t); };
+$('#spdseg').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; S.speed = +b.dataset.s; $$('#spdseg button').forEach((x) => x.classList.toggle('on', x === b)); if (S.running) { clearInterval(S.timer); S.timer = setInterval(tick, 1000 / S.speed); } };
+$('#goBtn').onclick = startNight; $('#rstBtn').onclick = resetNight;
+$('#truthChk').onchange = (e) => { S.truth = e.target.checked; drawTonight(); };
+$('#soundChk').onchange = (e) => { S.sound = e.target.checked; };
+$('#csvBtn').onclick = () => { if (S.tier !== 'pro') { toast('Clinician export is a Pro feature'); return; } if (!S.clip) return; downloadCsv('lucen_clinician_report.csv', clipCsv({ clip: S.clip, n: S.night, name: 'Live night', type: S.clip.type, tier: S.tier })); };
+$('#presBtn').onclick = () => $('#presenter').classList.toggle('on');
+$('#evalBtn').onclick = evalRun; $('#gtmMonth').oninput = drawGtm;
+$('#thr').oninput = (e) => { CFG.thr = +e.target.value; $('#thV').textContent = CFG.thr.toFixed(2); drawTonight(); };
+$('#per').oninput = (e) => { CFG.persist = +e.target.value; $('#peV').textContent = CFG.persist + ' s'; };
+$('#revRun').onclick = revRun; $('#gtmRun').onclick = gtmRun; liveValidate($('#revForm')); liveValidate($('#gtmForm'));
+document.addEventListener('keydown', (e) => {
+  const tg = e.target.tagName; if (tg === 'INPUT' || tg === 'SELECT' || tg === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key >= '1' && e.key <= '7') showTab(TABS[+e.key - 1][0]);
+  else if (e.key === 'p' || e.key === 'P') $('#presenter').classList.toggle('on');
+  else if (e.key === ' ' && tg !== 'BUTTON' && S.view === 'tonight') { e.preventDefault(); $('#goBtn').click(); }
+  else if ((e.key === 'r' || e.key === 'R') && S.view === 'tonight') resetNight();
+});
+let rz; window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(drawAll); });
+window.addEventListener('hashchange', () => showTab(location.hash.replace('#', '')));
+
+buildChips(); buildLab(); buildPlans(); buildMix(); buildMarket(); buildBiz(); buildWeights(); renderEval(window.LUCEN_EVAL0);
+$('#evalNote').textContent = 'Shipped setting on 6,000 held-out simulated nights';
+$$('#plans .opt').forEach((p) => p.classList.toggle('on', p.dataset.t === S.tier));
+setTier('core'); $('#toast').classList.remove('on'); resetNight();
+showTab(location.hash.replace('#', '') || 'tonight');
+window.__lucen = { S, CFG, hist, startNight, resetNight, setTier, showTab, labRun, Night };
+})();
+</script>
+</body>
+</html>

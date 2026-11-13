@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noFallthroughCasesInSwitch": true,
+    "types": [
+      "vite/client"
+    ]
+  },
+  "include": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/content.ts",
+    "src/story",
+    "src/scenes",
+    "src/device",
+    "src/ui/Chrome.tsx",
+    "src/ui/Cursor.tsx",
+    "src/ui/Sparkle.tsx",
+    "src/ui/Resume.tsx",
+    "src/ui/PlixLogo.tsx",
+    "src/vite-env.d.ts"
+  ]
+}
